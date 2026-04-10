@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { apiGet, apiPost, apiPut, apiDelete } from '../lib/api';
+import Swal from 'sweetalert2';
 import { Location } from '../types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -89,13 +90,14 @@ export default function LocationsView() {
   };
 
   const handleDelete = async (id: string | number, locName: string) => {
-    if (!window.confirm(`هل أنت متأكد من حذف ${locName}؟`)) return;
+    const r = await Swal.fire({ title: `حذف ${locName}؟`, icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', cancelButtonColor: '#6b7280', confirmButtonText: 'احذف', cancelButtonText: 'إلغاء', reverseButtons: true });
+    if (!r.isConfirmed) return;
     try {
       await apiDelete(`/locations/${id}`);
-      toast.success('تم الحذف');
+      Swal.fire({ title: 'تم!', icon: 'success', timer: 1200, showConfirmButton: false });
       fetchLocations();
     } catch (err: any) {
-      toast.error(err.message || 'حدث خطأ عند الحذف');
+      Swal.fire({ title: 'خطأ', text: err.message || 'حدث خطأ عند الحذف', icon: 'error' });
     }
   };
 

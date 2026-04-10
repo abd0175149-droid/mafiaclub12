@@ -10,6 +10,7 @@ import { Trash2, DollarSign, Plus, ArrowLeftRight, Building2 } from 'lucide-reac
 import { format } from 'date-fns';
 import { useAuth } from '../AuthContext';
 import { apiPost, apiDelete } from '../lib/api';
+import Swal from 'sweetalert2';
 import { toast } from 'sonner';
 
 interface FinanceViewProps {
@@ -61,11 +62,13 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
   };
 
   const handleDeleteCost = async (id: string | number) => {
-    if (!window.confirm('موافق على الحذف؟')) return;
+    const r = await Swal.fire({ title: 'حذف التكلفة؟', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', cancelButtonColor: '#6b7280', confirmButtonText: 'احذف', cancelButtonText: 'إلغاء', reverseButtons: true });
+    if (!r.isConfirmed) return;
     try {
       await apiDelete(`/costs/${id}`);
+      Swal.fire({ title: 'تم!', icon: 'success', timer: 1200, showConfirmButton: false });
       fetchData();
-    } catch (err: any) { toast.error(err.message); }
+    } catch (err: any) { Swal.fire({ title: 'خطأ', text: err.message, icon: 'error' }); }
   };
 
   const handleAddFoundational = async (e: React.FormEvent) => {
@@ -82,11 +85,13 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
   };
 
   const handleDeleteFoundational = async (id: string | number) => {
-    if (!window.confirm('موافق على الحذف؟')) return;
+    const r = await Swal.fire({ title: 'حذف التكلفة التأسيسية؟', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', cancelButtonColor: '#6b7280', confirmButtonText: 'احذف', cancelButtonText: 'إلغاء', reverseButtons: true });
+    if (!r.isConfirmed) return;
     try {
       await apiDelete(`/foundational/${id}`);
+      Swal.fire({ title: 'تم!', icon: 'success', timer: 1200, showConfirmButton: false });
       fetchData();
-    } catch (err: any) { toast.error(err.message); }
+    } catch (err: any) { Swal.fire({ title: 'خطأ', text: err.message, icon: 'error' }); }
   };
 
   const totalCosts = costs.reduce((s, c) => s + c.amount, 0);

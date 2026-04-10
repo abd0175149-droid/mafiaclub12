@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { apiPost, apiPut, apiDelete } from '../lib/api';
+import Swal from 'sweetalert2';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -70,14 +71,14 @@ export default function UserManagementTab({ users, fetchAll }: { users: StaffMem
   };
 
   const handleDeleteUser = async (targetId: string | number) => {
-    if (!window.confirm('هل أنت متأكد من حذف هذا الموظف؟')) return;
-
+    const r = await Swal.fire({ title: 'حذف الموظف؟', text: 'هل أنت متأكد من حذف هذا الموظف؟', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', cancelButtonColor: '#6b7280', confirmButtonText: 'احذف', cancelButtonText: 'إلغاء', reverseButtons: true });
+    if (!r.isConfirmed) return;
     try {
       await apiDelete(`/staff/${targetId}`);
-      toast.success('تم حذف الموظف بنجاح');
+      Swal.fire({ title: 'تم!', text: 'تم حذف الموظف بنجاح', icon: 'success', timer: 1500, showConfirmButton: false });
       fetchAll();
     } catch (err: any) {
-      toast.error(err.message || 'حدث خطأ أثناء حذف الموظف');
+      Swal.fire({ title: 'خطأ', text: err.message || 'حدث خطأ أثناء حذف الموظف', icon: 'error' });
     }
   };
 

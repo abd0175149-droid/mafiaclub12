@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { apiGet, apiPost, apiPut, apiDelete } from './lib/api';
+import Swal from 'sweetalert2';
 import { collection, query, onSnapshot, orderBy, Timestamp, addDoc, updateDoc, doc, deleteDoc, setDoc, where, writeBatch, getDocs, db, handleFirestoreError, OperationType, createNotification, notifyAllAdmins, updatePassword, updateProfile, auth as firebaseAuth } from './lib/firebase-compat';
 import { Activity, Booking, Cost, Notification, UserSettings, FoundationalCost, StaffMember, Location } from './types';
 import LocationsView from './views/LocationsView';
@@ -157,19 +158,24 @@ export default function Dashboard() {
   };
 
   const handleDeleteActivity = async (activity: Activity) => {
-    console.log('[DELETE] handleDeleteActivity called for:', activity.id, activity.name);
-    const confirmed = window.confirm(`هل تريد حذف "${activity.name}"?\nسيتم حذف جميع الحجوزات والتكاليف المرتبطة.`);
-    console.log('[DELETE] User confirmed:', confirmed);
-    if (!confirmed) return;
+    const result = await Swal.fire({
+      title: 'هل تريد حذف هذا النشاط؟',
+      text: `سيتم حذف "${activity.name}" وجميع الحجوزات والتكاليف المرتبطة.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'نعم، احذف',
+      cancelButtonText: 'إلغاء',
+      reverseButtons: true
+    });
+    if (!result.isConfirmed) return;
     try {
-      console.log('[DELETE] Calling API: DELETE /activities/' + activity.id);
-      const result = await apiDelete(`/activities/${activity.id}`);
-      console.log('[DELETE] API response:', result);
-      toast.success('تم حذف النشاط وبياناته المرتبطة');
+      await apiDelete(`/activities/${activity.id}`);
+      Swal.fire({ title: 'تم الحذف!', text: `تم حذف "${activity.name}" بنجاح`, icon: 'success', timer: 1500, showConfirmButton: false });
       fetchAll();
     } catch (err: any) {
-      console.error('[DELETE] API error:', err);
-      toast.error(err.message || 'حدث خطأ أثناء الحذف');
+      Swal.fire({ title: 'خطأ', text: err.message || 'حدث خطأ أثناء الحذف', icon: 'error' });
     }
   };
 
@@ -404,7 +410,7 @@ export default function Dashboard() {
           </div>
 
           <div className={activeTab === 'bookings' ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
-            <BookingsTabContent bookings={bookings} activities={activities} />
+            <BookingsTabContent bookings={bookings} activities={activities} fetchAll={fetchAll} />
           </div>
 
           <div className={activeTab === 'finances' ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
@@ -625,7 +631,7 @@ const ActivityCard: React.FC<ActivityCardProps> = ({ activity, stats, onDelete, 
 }
 
 // BookingsTabContent with search, filter, edit [BL-05, F-03, F-06, UX-02, UX-03]
-function BookingsTabContent({ bookings, activities }: { bookings: Booking[], activities: Activity[] }) {
+function BookingsTabContent({ bookings, activities, fetchAll }: { bookings: Booking[], activities: Activity[], fetchAll: () => void }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterActivity, setFilterActivity] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -741,16 +747,38 @@ function BookingsTabContent({ bookings, activities }: { bookings: Booking[], act
                       <Pencil className="w-3.5 h-3.5" />
                     </Button>
                     {!booking.isPaid && !booking.isFree && (
-                      <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => {
+                      <Button size="sm" variant="outline" className="h-8 text-xs" onClick={async () => {
                         const basePrice = activities.find(a => a.id === booking.activityId)?.basePrice || 0;
                         const suggestedAmount = basePrice * booking.count;
-                        const actualAmount = prompt(`المبلغ المقترح: ${suggestedAmount} ${CURRENCY}\nأدخل المبلغ الفعلي المدفوع:`, String(suggestedAmount));
-                        if (actualAmount !== null) {
-                          apiPut('/bookings/' + booking.id + '/pay', { paidAmount: Number(actualAmount) }).then(() => { toast.success('تم تأكيد الدفع'); window.location.reload(); }).catch((err) => toast.error(err.message || 'خطأ'));
+                        const { value: actualAmount } = await Swal.fire({
+                          title: 'تأكيد الدفع',
+                          input: 'number',
+                          inputLabel: `المبلغ المقترح: ${suggestedAmount} ${CURRENCY}`,
+                          inputValue: suggestedAmount,
+                          showCancelButton: true,
+                          confirmButtonText: 'تأكيد الدفع',
+                          cancelButtonText: 'إلغاء',
+                          confirmButtonColor: '#10b981',
+                          reverseButtons: true
+                        });
+                        if (actualAmount !== undefined) {
+                          try {
+                            await apiPut('/bookings/' + booking.id + '/pay', { paidAmount: Number(actualAmount) });
+                            Swal.fire({ title: 'تم!', text: 'تم تأكيد الدفع بنجاح', icon: 'success', timer: 1500, showConfirmButton: false });
+                            fetchAll();
+                          } catch (err: any) { Swal.fire({ title: 'خطأ', text: err.message, icon: 'error' }); }
                         }
                       }}>دفع</Button>
                     )}
-                    <Button size="icon" variant="ghost" className="text-rose-500 h-8 w-8" onClick={() => { if (window.confirm('هل تريد حذف هذا الحجز؟')) { apiDelete('/bookings/' + booking.id).then(() => { toast.success('تم حذف الحجز'); window.location.reload(); }).catch((err) => toast.error(err.message || 'خطأ')); } }}>
+                    <Button size="icon" variant="ghost" className="text-rose-500 h-8 w-8" onClick={async () => {
+                      const r = await Swal.fire({ title: 'حذف الحجز؟', text: 'هل تريد حذف هذا الحجز؟', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', cancelButtonColor: '#6b7280', confirmButtonText: 'احذف', cancelButtonText: 'إلغاء', reverseButtons: true });
+                      if (!r.isConfirmed) return;
+                      try {
+                        await apiDelete('/bookings/' + booking.id);
+                        Swal.fire({ title: 'تم!', text: 'تم حذف الحجز', icon: 'success', timer: 1500, showConfirmButton: false });
+                        fetchAll();
+                      } catch (err: any) { Swal.fire({ title: 'خطأ', text: err.message, icon: 'error' }); }
+                    }}>
                       <Trash2 className="w-3.5 h-3.5" />
                     </Button>
                   </div>
@@ -1228,8 +1256,10 @@ function FoundationalCostsTab({ costs }: { costs: FoundationalCost[] }) {
                 </TableCell>
                 <TableCell>{format(safeDate(c.date)!, 'yyyy/MM/dd')}</TableCell>
                 <TableCell className="text-left">
-                  <Button variant="ghost" size="icon-sm" className="text-rose-500" onClick={() => {
-                    if (window.confirm('هل تريد حذف هذه التكلفة التأسيسية؟')) { apiDelete('/foundational/' + c.id).then(() => window.location.reload()).catch(e => console.error(e)); }
+                  <Button variant="ghost" size="icon-sm" className="text-rose-500" onClick={async () => {
+                    const r = await Swal.fire({ title: 'حذف التكلفة التأسيسية؟', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', cancelButtonColor: '#6b7280', confirmButtonText: 'احذف', cancelButtonText: 'إلغاء', reverseButtons: true });
+                    if (!r.isConfirmed) return;
+                    try { await apiDelete('/foundational/' + c.id); Swal.fire({ title: 'تم!', icon: 'success', timer: 1200, showConfirmButton: false }).then(() => window.location.reload()); } catch (e: any) { Swal.fire({ title: 'خطأ', text: e.message, icon: 'error' }); }
                   }}><Trash2 className="w-4 h-4" /></Button>
                 </TableCell>
               </TableRow>
