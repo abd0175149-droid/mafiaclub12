@@ -37,7 +37,7 @@ export default function ActivityDetails({ activity, location, bookings, costs, o
     // Handle folder links: https://drive.google.com/drive/folders/FOLDER_ID
     const folderMatch = link.match(/\/folders\/([a-zA-Z0-9_-]+)/);
     if (folderMatch) {
-      return 'https://drive.google.com/embeddedfolderview?id=' + folderMatch[1] + '#grid';
+      return 'https://drive.google.com/drive/folders/' + folderMatch[1];
     }
     // Handle file links: https://drive.google.com/file/d/FILE_ID/view
     const fileMatch = link.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
@@ -177,6 +177,7 @@ export default function ActivityDetails({ activity, location, bookings, costs, o
                   src={driveEmbedUrl} 
                   className="w-full h-full border-none absolute inset-0"
                   allow="autoplay"
+                  sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-top-navigation-by-user-activation"
                   title="Google Drive Activity Files"
                 />
               )}

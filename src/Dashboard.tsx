@@ -384,7 +384,7 @@ export default function Dashboard() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {activities.length > 0 ? activities.map(activity => (
                   <div className="cursor-pointer" key={activity.id} onClick={() => setSelectedActivity(activity)}>
-                    <ActivityCard activity={activity} stats={getActivityStats(activity.id)} onDelete={() => handleDeleteActivity(activity)} />
+                    <ActivityCard activity={activity} stats={getActivityStats(activity.id)} onDelete={() => handleDeleteActivity(activity)} onStatusChange={fetchAll} />
                   </div>
                 )) : (
                   <div className="col-span-full text-center py-16 text-neutral-400">
@@ -558,7 +558,7 @@ interface ActivityCardProps {
   onDelete?: () => void;
 }
 
-const ActivityCard: React.FC<ActivityCardProps> = ({ activity, stats, onDelete }) => {
+const ActivityCard: React.FC<ActivityCardProps> = ({ activity, stats, onDelete, onStatusChange }) => {
   return (
     <Card className="border-none shadow-sm hover:shadow-md transition-shadow">
       <CardHeader className="pb-2">
@@ -592,7 +592,7 @@ const ActivityCard: React.FC<ActivityCardProps> = ({ activity, stats, onDelete }
         <div className="flex items-center gap-2 pt-2 border-t border-neutral-100" onClick={(e) => e.stopPropagation()}>
           <Select
             value={activity.status}
-            onValueChange={async (v) => { try { await apiPut('/activities/' + activity.id, { status: v }); window.location.reload(); } catch (e) { console.error(e); } }}
+            onValueChange={async (v) => { try { await apiPut('/activities/' + activity.id, { status: v }); if (onStatusChange) onStatusChange(); } catch (e) { console.error(e); } }}
           >
             <SelectTrigger className="h-8 text-xs flex-1">
               <SelectValue />
@@ -605,9 +605,9 @@ const ActivityCard: React.FC<ActivityCardProps> = ({ activity, stats, onDelete }
             </SelectContent>
           </Select>
           {onDelete && (
-            <Button variant="ghost" size="icon" className="text-rose-500 h-8 w-8" onClick={(e) => { e.stopPropagation(); onDelete && onDelete(); }}>
+            <button type="button" className="inline-flex items-center justify-center text-rose-500 h-8 w-8 rounded-md hover:bg-rose-50 transition-colors" onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (onDelete) onDelete(); }}>
               <Trash2 className="w-4 h-4" />
-            </Button>
+            </button>
           )}
         </div>
       </CardContent>
