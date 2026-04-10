@@ -348,7 +348,7 @@ export default function Dashboard() {
                       <PieChartIcon className="w-5 h-5" /> حالة الحجوزات
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="h-[300px]">
+                  <CardContent className="h-[300px]" style={{ minWidth: 200, minHeight: 200 }}>
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={[
                         { name: 'مدفوع', count: bookings.filter(b => b.isPaid && !b.isFree).length, color: '#10b981' },
@@ -480,15 +480,11 @@ function NotificationCenter({ notifications }: { notifications: Notification[] }
   const unreadCount = notifications.filter(n => !n.read).length;
 
   const markAsRead = async (id: string | number) => {
-    await updateDoc(doc(db, 'notifications', id.toString()), { read: true });
+    await apiPut('/notifications/' + id + '/read', {});
   };
 
   const markAllAsRead = async () => {
-    const batch = writeBatch(db);
-    notifications.filter(n => !n.read).forEach(n => {
-      batch.update(doc(db, 'notifications', n.id.toString()), { read: true });
-    });
-    await batch.commit();
+    await apiPut('/notifications/read-all', {});
   };
 
   return (
@@ -644,7 +640,7 @@ function BookingsTabContent({ bookings, activities }: { bookings: Booking[], act
     if (!editingBooking) return;
     const fd = new FormData(e.currentTarget);
     try {
-      await updateDoc(doc(db, 'bookings', editingBooking.id), {
+      await apiPut('/bookings/' + editingBooking.id, {
         name: fd.get('name') as string,
         phone: fd.get('phone') as string,
         count: Number(fd.get('count')),
@@ -654,8 +650,9 @@ function BookingsTabContent({ bookings, activities }: { bookings: Booking[], act
       });
       setEditingBooking(null);
       toast.success('تم تحديث الحجز بنجاح');
-    } catch (err) {
-      handleFirestoreError(err, OperationType.UPDATE, 'bookings');
+      window.location.reload();
+    } catch (err: any) {
+      toast.error(err.message || 'حدث خطأ أثناء تحديث الحجز');
     }
   };
 
@@ -739,8 +736,7 @@ function BookingsTabContent({ bookings, activities }: { bookings: Booking[], act
                         const suggestedAmount = basePrice * booking.count;
                         const actualAmount = prompt(`المبلغ المقترح: ${suggestedAmount} ${CURRENCY}\nأدخل المبلغ الفعلي المدفوع:`, String(suggestedAmount));
                         if (actualAmount !== null) {
-                          updateDoc(doc(db, 'bookings', booking.id), { isPaid: true, paidAmount: Number(actualAmount) });
-                          toast.success('تم تأكيد الدفع');
+                          apiPut('/bookings/' + booking.id + '/pay', { paidAmount: Number(actualAmount) }).then(() => { toast.success('تم تأكيد الدفع'); window.location.reload(); }).catch((err) => toast.error(err.message || 'خطأ'));
                         }
                       }}>دفع</Button>
                     )}
