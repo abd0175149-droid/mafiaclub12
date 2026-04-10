@@ -75,5 +75,7 @@ export interface StaffMember {
   username: string;
   displayName: string;
   role: 'admin' | 'manager';
+  photoURL?: string | null;
+  permissions?: string[] | string;
   createdAt: string;
 }

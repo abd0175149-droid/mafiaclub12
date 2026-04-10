@@ -7,13 +7,13 @@ const router = Router();
 
 // GET /api/staff (admin only)
 router.get('/', requireAuth, requireAdmin, (_req, res) => {
-  const rows = db.prepare('SELECT id, username, displayName, role, createdAt FROM staff ORDER BY createdAt DESC').all();
+  const rows = db.prepare('SELECT id, username, displayName, role, photoURL, permissions, createdAt FROM staff ORDER BY createdAt DESC').all();
   res.json(rows);
 });
 
 // POST /api/staff (admin only)
 router.post('/', requireAuth, requireAdmin, (req: AuthRequest, res) => {
-  const { username, password, displayName, role } = req.body;
+  const { username, password, displayName, role, permissions } = req.body;
   if (!username || !password || !displayName) {
     return res.status(400).json({ error: 'جميع الحقول مطلوبة' });
   }
@@ -25,16 +25,49 @@ router.post('/', requireAuth, requireAdmin, (req: AuthRequest, res) => {
   }
 
   const hash = bcrypt.hashSync(password, 10);
+  const permsStr = permissions ? JSON.stringify(permissions) : '["activities","bookings","finances","locations"]';
+  
   const result = db.prepare(
-    'INSERT INTO staff (username, password, displayName, role) VALUES (?,?,?,?)'
-  ).run(username, hash, displayName, role || 'manager');
+    'INSERT INTO staff (username, password, displayName, role, permissions) VALUES (?,?,?,?,?)'
+  ).run(username, hash, displayName, role || 'manager', permsStr);
 
   // Create default settings
   db.prepare('INSERT INTO user_settings (userId) VALUES (?)').run(result.lastInsertRowid);
 
   logAudit(req.user!.id, 'create', 'staff', result.lastInsertRowid.toString());
-  const staff = db.prepare('SELECT id, username, displayName, role, createdAt FROM staff WHERE id = ?').get(result.lastInsertRowid);
+  const staff = db.prepare('SELECT id, username, displayName, role, photoURL, permissions, createdAt FROM staff WHERE id = ?').get(result.lastInsertRowid);
   res.status(201).json(staff);
+});
+
+// PUT /api/staff/me (Update own profile: photo, name)
+router.put('/me', requireAuth, (req: AuthRequest, res) => {
+  const { displayName, photoURL } = req.body;
+  
+  if (displayName) {
+    db.prepare('UPDATE staff SET displayName = ? WHERE id = ?').run(displayName, req.user!.id);
+  }
+  if (photoURL !== undefined) {
+    db.prepare('UPDATE staff SET photoURL = ? WHERE id = ?').run(photoURL, req.user!.id);
+  }
+  
+  logAudit(req.user!.id, 'update', 'staff_self', req.user!.id);
+  res.json({ success: true });
+});
+
+// PUT /api/staff/:id (admin only, update entire profile)
+router.put('/:id', requireAuth, requireAdmin, (req: AuthRequest, res) => {
+  const { displayName, role, permissions } = req.body;
+  if (!displayName) {
+    return res.status(400).json({ error: 'الاسم مطلوب' });
+  }
+
+  const permsStr = permissions ? JSON.stringify(permissions) : '["activities","bookings","finances","locations"]';
+
+  db.prepare('UPDATE staff SET displayName = ?, role = ?, permissions = ? WHERE id = ?').run(
+    displayName, role || 'manager', permsStr, req.params.id
+  );
+  logAudit(req.user!.id, 'update', 'staff', req.params.id);
+  res.json({ success: true });
 });
 
 // PUT /api/staff/:id/role (admin only)

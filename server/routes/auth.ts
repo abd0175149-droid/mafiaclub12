@@ -21,11 +21,20 @@ router.post('/login', (req, res) => {
     return res.status(401).json({ error: 'اسم المستخدم أو كلمة المرور غير صحيحة' });
   }
 
+  let permissions = [];
+  try {
+    permissions = user.permissions ? JSON.parse(user.permissions) : [];
+  } catch (e) {
+    permissions = [];
+  }
+
   const tokenPayload = {
     id: user.id,
     username: user.username,
     displayName: user.displayName,
-    role: user.role
+    role: user.role,
+    photoURL: user.photoURL,
+    permissions
   };
 
   const token = generateToken(tokenPayload);

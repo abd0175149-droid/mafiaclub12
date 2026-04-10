@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import db, { logAudit } from '../database.js';
-import { type AuthRequest, requireAuth, requireAdmin } from '../middleware/auth.js';
+import { type AuthRequest, requireAuth, requirePermission, requireAdmin } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -11,7 +11,7 @@ router.get('/', requireAuth, (_req, res) => {
 });
 
 // POST /api/foundational
-router.post('/', requireAuth, requireAdmin, (req: AuthRequest, res) => {
+router.post('/', requireAuth, requirePermission('finances'), (req: AuthRequest, res) => {
   const { item, amount, paidBy, source, date } = req.body;
   if (!item || amount === undefined || !date) return res.status(400).json({ error: 'البند والمبلغ والتاريخ مطلوبين' });
 
@@ -25,7 +25,7 @@ router.post('/', requireAuth, requireAdmin, (req: AuthRequest, res) => {
 });
 
 // DELETE /api/foundational/:id
-router.delete('/:id', requireAuth, requireAdmin, (req: AuthRequest, res) => {
+router.delete('/:id', requireAuth, requirePermission('finances'), (req: AuthRequest, res) => {
   const existing = db.prepare('SELECT * FROM foundational_costs WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'التكلفة غير موجودة' });
 

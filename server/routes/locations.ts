@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import db, { logAudit } from '../database.js';
-import { requireAuth, requireAdmin, type AuthRequest } from '../middleware/auth.js';
+import { requireAuth, requirePermission, type AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -19,7 +19,7 @@ router.get('/', requireAuth, (req, res) => {
 });
 
 // POST /api/locations
-router.post('/', requireAdmin, (req: AuthRequest, res) => {
+router.post('/', requireAuth, requirePermission('locations'), (req: AuthRequest, res) => {
   const { name, mapUrl, offers } = req.body;
   if (!name) return res.status(400).json({ error: 'Name is required' });
 
@@ -33,7 +33,7 @@ router.post('/', requireAdmin, (req: AuthRequest, res) => {
 });
 
 // PUT /api/locations/:id
-router.put('/:id', requireAdmin, (req: AuthRequest, res) => {
+router.put('/:id', requireAuth, requirePermission('locations'), (req: AuthRequest, res) => {
   const { name, mapUrl, offers } = req.body;
   const id = req.params.id;
   if (!name) return res.status(400).json({ error: 'Name is required' });
@@ -48,7 +48,7 @@ router.put('/:id', requireAdmin, (req: AuthRequest, res) => {
 });
 
 // DELETE /api/locations/:id
-router.delete('/:id', requireAdmin, (req: AuthRequest, res) => {
+router.delete('/:id', requireAuth, requirePermission('locations'), (req: AuthRequest, res) => {
   const id = req.params.id;
   db.prepare('DELETE FROM locations WHERE id = ?').run(id);
   logAudit(req.user!.id, 'DELETE', 'locations', id);

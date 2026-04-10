@@ -6,6 +6,9 @@ import LocationsView from './views/LocationsView';
 import FinanceView from './views/FinanceView';
 import ActivityDetails from './views/ActivityDetails';
 import { useAuth } from './AuthContext';
+import ProfileTab from './views/ProfileSettings';
+import UserManagementTab from './views/UserManagementTab';
+import { ImageCropper } from '@/components/ImageCropper';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -202,21 +205,25 @@ export default function Dashboard() {
          
          <nav className="flex-1 overflow-y-auto p-4 space-y-2">
             {[
-              { id: 'overview', icon: LayoutDashboard, label: 'نظرة عامة' },
-              { id: 'activities', icon: CalendarIcon, label: 'الأنشطة المجدولة' },
-              { id: 'bookings', icon: Users, label: 'قاعدة الحجوزات' },
-              { id: 'finances', icon: DollarSign, label: 'المالية الشاملة' },
-              { id: 'locations', icon: PieChartIcon, label: 'أماكن الفعاليات' },
-            ].map(tc => (
-              <button 
-                key={tc.id} 
-                onClick={() => { setActiveTab(tc.id); setIsMobileMenuOpen(false); }} 
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === tc.id ? 'bg-neutral-800 text-white shadow-md border border-neutral-700/50' : 'text-neutral-400 hover:bg-neutral-800/50 hover:text-white'}`}
-              >
-                <tc.icon className="w-5 h-5 flex-shrink-0" />
-                <span className="font-bold text-sm">{tc.label}</span>
-              </button>
-            ))}
+              { id: 'overview', icon: LayoutDashboard, label: 'نظرة عامة', reqPerm: null },
+              { id: 'activities', icon: CalendarIcon, label: 'الأنشطة المجدولة', reqPerm: 'activities' },
+              { id: 'bookings', icon: Users, label: 'قاعدة الحجوزات', reqPerm: 'bookings' },
+              { id: 'finances', icon: DollarSign, label: 'المالية الشاملة', reqPerm: 'finances' },
+              { id: 'locations', icon: PieChartIcon, label: 'أماكن الفعاليات', reqPerm: 'locations' },
+            ].map(tc => {
+              const hasPerm = isAdmin || !tc.reqPerm || (Array.isArray(profile?.permissions) && profile.permissions.includes(tc.reqPerm));
+              if (!hasPerm) return null;
+              return (
+                <button 
+                  key={tc.id} 
+                  onClick={() => { setActiveTab(tc.id); setIsMobileMenuOpen(false); }} 
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === tc.id ? 'bg-neutral-800 text-white shadow-md border border-neutral-700/50' : 'text-neutral-400 hover:bg-neutral-800/50 hover:text-white'}`}
+                >
+                  <tc.icon className="w-5 h-5 flex-shrink-0" />
+                  <span className="font-bold text-sm">{tc.label}</span>
+                </button>
+              );
+            })}
             {isAdmin && (
               <button 
                 onClick={() => { setActiveTab('users'); setIsMobileMenuOpen(false); }} 
@@ -227,46 +234,50 @@ export default function Dashboard() {
               </button>
             )}
          </nav>
-
-         <div className="p-4 border-t border-neutral-800 flex items-center justify-between">
-           <DropdownMenu>
-              <DropdownMenuTrigger render={
-                <Button variant="ghost" className="w-full flex items-center justify-start gap-3 p-3 rounded-xl hover:bg-neutral-800 border border-neutral-800 h-auto">
-                  <div className="w-8 h-8 rounded-full bg-neutral-700 flex items-center justify-center overflow-hidden shrink-0">
-                    {profile?.photoURL ? <img src={profile.photoURL} alt="" className="w-full h-full object-cover" /> : <UserIcon className="w-4 h-4 text-white" />}
-                  </div>
-                  <div className="text-right flex-1 overflow-hidden">
-                    <p className="text-xs font-bold leading-none truncate text-right text-white">{profile?.displayName || 'مستخدم'}</p>
-                    <p className="text-[10px] text-neutral-400 truncate text-right mt-1">{profile?.role === 'admin' ? 'مسؤول' : 'مدير'}</p>
-                  </div>
-                </Button>
-              } />
-              <DropdownMenuContent align="end" className="w-56 mb-2">
-                <DropdownMenuItem className="cursor-pointer" onClick={() => { setActiveTab('profile'); setIsMobileMenuOpen(false); }}>
-                  <SettingsIcon className="w-4 h-4 ml-2" /> إعدادات الحساب
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem className="cursor-pointer text-rose-600 focus:bg-rose-50" onClick={() => logout()}>
-                  <LogOut className="w-4 h-4 ml-2" /> تسجيل الخروج
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-           </DropdownMenu>
-           <NotificationCenter notifications={notifications} />
-         </div>
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto w-full min-w-0">
-         {/* Mobile Header */}
-         <div className="md:hidden bg-white border-b border-neutral-200 p-4 flex items-center justify-between sticky top-0 z-30 shadow-sm">
-           <div className="flex items-center gap-2">
-             <Shield className="w-6 h-6 text-emerald-500" />
-             <span className="font-bold text-lg text-neutral-900">Mafia Club</span>
-           </div>
-           <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(true)}>
-             <Menu className="w-6 h-6 text-neutral-900" />
-           </Button>
-         </div>
+      <main className="flex-1 overflow-y-auto w-full min-w-0 bg-neutral-50/50 relative">
+         {/* Top Navbar */}
+         <header className="bg-white border-b border-neutral-200 p-4 sticky top-0 z-30 shadow-sm flex items-center justify-between">
+            <div className="flex items-center gap-4 w-full justify-between md:justify-end flex-row-reverse md:flex-row">
+              {/* Mobile Branding inside Navbar */}
+              <div className="flex items-center gap-2 md:hidden">
+                <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(true)}>
+                  <Menu className="w-6 h-6 text-neutral-900" />
+                </Button>
+                <span className="font-bold text-lg text-neutral-900 ml-2">Mafia Club</span>
+              </div>
+              
+              {/* Desktop/Mobile User Controls */}
+              <div className="flex items-center gap-3 dir-ltr">
+                 <NotificationCenter notifications={notifications} />
+                 <div className="h-6 w-px bg-neutral-200 mx-1"></div>
+                 <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" className="flex items-center gap-2 rounded-full px-2 py-1.5 hover:bg-neutral-50 border border-transparent hover:border-neutral-200 transition-all">
+                        <div className="text-right hidden sm:block mr-2">
+                          <p className="text-sm font-bold leading-none text-neutral-800">{profile?.displayName || 'مستخدم'}</p>
+                          <p className="text-[11px] text-neutral-500 mt-0.5">{isAdmin ? 'مسؤول' : 'مدير'}</p>
+                        </div>
+                        <div className="w-9 h-9 rounded-full bg-neutral-100 flex items-center justify-center overflow-hidden border border-neutral-200 shrink-0">
+                          {profile?.photoURL ? <img src={profile.photoURL} alt="" className="w-full h-full object-cover" /> : <UserIcon className="w-5 h-5 text-neutral-500" />}
+                        </div>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56 mt-1 font-sans" dir="rtl">
+                      <DropdownMenuItem className="cursor-pointer py-2.5" onClick={() => { setActiveTab('profile'); setIsMobileMenuOpen(false); }}>
+                        <SettingsIcon className="w-4 h-4 ml-2" /> إعدادات الحساب
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem className="cursor-pointer text-rose-600 focus:bg-rose-50 py-2.5" onClick={() => logout()}>
+                        <LogOut className="w-4 h-4 ml-2" /> تسجيل الخروج
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                 </DropdownMenu>
+              </div>
+            </div>
+         </header>
 
          <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
             
@@ -435,7 +446,7 @@ export default function Dashboard() {
 
             {isAdmin && (
               <div className={activeTab === 'users' ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
-                <UserManagementTab users={staff} />
+                <UserManagementTab users={staff} fetchAll={fetchAll} />
               </div>
             )}
          </div>
@@ -1166,164 +1177,6 @@ function FoundationalCostForm() {
   );
 }
 
-function UserManagementTab({ users }: { users: any[] }) {
-  const [open, setOpen] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
-
-  const handleCreateUser = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setIsCreating(true);
-    const formData = new FormData(e.currentTarget);
-    const username = formData.get('username') as string;
-    const password = formData.get('password') as string;
-    const role = formData.get('role') as 'admin' | 'manager';
-    const displayName = formData.get('displayName') as string;
-
-    try {
-      // [DI-04] Check username uniqueness
-      const existingQ = query(collection(db, 'staff'), where('username', '==', username));
-      const existing = await getDocs(existingQ);
-      if (!existing.empty) {
-        toast.error('اسم المستخدم موجود بالفعل، اختر اسماً آخر');
-        setIsCreating(false);
-        return;
-      }
-
-      // Create directly in Firestore 'staff' collection
-      await addDoc(collection(db, 'staff'), {
-        username,
-        password,
-        displayName,
-        role,
-        createdAt: Timestamp.now()
-      });
-
-      toast.success('تم إضافة الموظف بنجاح');
-      setOpen(false);
-    } catch (err: any) {
-      console.error(err);
-      toast.error('حدث خطأ أثناء إضافة الموظف');
-    } finally {
-      setIsCreating(false);
-    }
-  };
-
-  const handleDeleteUser = async (targetId: string) => {
-    if (!window.confirm('هل أنت متأكد من حذف هذا الموظف؟')) return;
-
-    try {
-      await deleteDoc(doc(db, 'staff', targetId));
-      toast.success('تم حذف الموظف بنجاح');
-    } catch (err: any) {
-      console.error(err);
-      toast.error('حدث خطأ أثناء حذف الموظف');
-    }
-  };
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">إدارة الموظفين</h2>
-          <p className="text-neutral-500">إدارة حسابات الدخول للموظفين (اسم مستخدم وكلمة مرور)</p>
-        </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger render={<Button className="bg-neutral-900 text-white"><Plus className="w-4 h-4 ml-2" /> إضافة موظف جديد</Button>} />
-          <DialogContent dir="rtl">
-            <DialogHeader><DialogTitle>إضافة موظف جديد</DialogTitle></DialogHeader>
-            <form onSubmit={handleCreateUser} className="space-y-4">
-              <div className="space-y-2"><Label>الاسم الكامل</Label><Input name="displayName" required /></div>
-              <div className="space-y-2"><Label>اسم المستخدم</Label><Input name="username" required /></div>
-              <div className="space-y-2"><Label>كلمة المرور</Label><Input name="password" type="text" required /></div>
-              <div className="space-y-2">
-                <Label>الصلاحية</Label>
-                <Select name="role" defaultValue="manager">
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="manager">مدير (Manager)</SelectItem>
-                    <SelectItem value="admin">مسؤول (Admin)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <DialogFooter><Button type="submit" disabled={isCreating} className="w-full">{isCreating ? 'جاري الإضافة...' : 'إضافة الموظف'}</Button></DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      <Card>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>الموظف</TableHead>
-              <TableHead>اسم المستخدم</TableHead>
-              <TableHead>الحالة</TableHead>
-              <TableHead>الصلاحية</TableHead>
-              <TableHead>تاريخ الانضمام</TableHead>
-              <TableHead className="text-left">الإجراءات</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {users.map(u => (
-              <TableRow key={u.id}>
-                <TableCell className="font-medium">{u.displayName}</TableCell>
-                <TableCell>{u.username}</TableCell>
-                <TableCell><Badge variant="outline" className="bg-emerald-50 text-emerald-700">نشط</Badge></TableCell>
-                <TableCell>
-                  <Select
-                    value={u.role}
-                    onValueChange={async (v) => {
-                      await updateDoc(doc(db, 'staff', u.id), { role: v });
-                      toast.success('تم تعديل الصلاحية');
-                    }}
-                  >
-                    <SelectTrigger className="h-8 w-28 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="manager">مدير</SelectItem>
-                      <SelectItem value="admin">مسؤول</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </TableCell>
-                <TableCell>{u.createdAt ? format(safeDate(u.createdAt)!, 'yyyy/MM/dd') : '-'}</TableCell>
-                <TableCell className="text-left">
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={async () => {
-                        const newPass = prompt('أدخل كلمة المرور الجديدة:');
-                        if (newPass && newPass.length >= 4) {
-                          await updateDoc(doc(db, 'staff', u.id), { password: newPass });
-                          toast.success('تم تغيير كلمة المرور');
-                        } else if (newPass) {
-                          toast.error('كلمة المرور يجب أن تكون 4 أحرف على الأقل');
-                        }
-                      }}
-                    >
-                      <Key className="w-3.5 h-3.5" />
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="text-rose-500 h-8 w-8"
-                      onClick={() => handleDeleteUser(u.id)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </Card>
-    </div>
-  );
-}
-
 function FoundationalCostsTab({ costs }: { costs: FoundationalCost[] }) {
   const totalFoundational = costs.reduce((sum, c) => sum + c.amount, 0);
 
@@ -1386,91 +1239,4 @@ function FoundationalCostsTab({ costs }: { costs: FoundationalCost[] }) {
   );
 }
 
-function ProfileTab() {
-  const { user, profile } = useAuth();
-  const [displayName, setDisplayName] = useState(profile?.displayName || '');
-  const [photoURL, setPhotoURL] = useState(profile?.photoURL || '');
-  const [newPassword, setNewPassword] = useState('');
-  const [isUpdating, setIsUpdating] = useState(false);
 
-  const handleUpdateProfile = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user) return;
-    setIsUpdating(true);
-    try {
-      await updateProfile(user, { displayName, photoURL });
-      await setDoc(doc(db, 'users', user.uid), { displayName, photoURL }, { merge: true });
-      toast.success('تم تحديث الملف الشخصي بنجاح');
-    } catch (err) {
-      toast.error('حدث خطأ أثناء التحديث');
-    } finally {
-      setIsUpdating(false);
-    }
-  };
-
-  const handleChangePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user || !newPassword) return;
-    setIsUpdating(true);
-    try {
-      await updatePassword(user, newPassword);
-      setNewPassword('');
-      toast.success('تم تغيير كلمة المرور بنجاح');
-    } catch (err: any) {
-      if (err.code === 'auth/requires-recent-login') {
-        toast.error('يرجى تسجيل الخروج والدخول مرة أخرى لتغيير كلمة المرور');
-      } else {
-        toast.error('حدث خطأ أثناء تغيير كلمة المرور');
-      }
-    } finally {
-      setIsUpdating(false);
-    }
-  };
-
-  return (
-    <div className="max-w-2xl mx-auto space-y-8">
-      <div>
-        <h2 className="text-2xl font-bold">إعدادات الحساب</h2>
-        <p className="text-neutral-500">إدارة معلوماتك الشخصية وكلمة المرور</p>
-      </div>
-
-      <Card>
-        <CardHeader><CardTitle className="text-lg">المعلومات الشخصية</CardTitle></CardHeader>
-        <CardContent>
-          <form onSubmit={handleUpdateProfile} className="space-y-4">
-            <div className="flex justify-center mb-6">
-              <div className="relative group">
-                <div className="w-24 h-24 rounded-full bg-neutral-100 flex items-center justify-center overflow-hidden border-4 border-white shadow-md">
-                  {photoURL ? <img src={photoURL} alt="" className="w-full h-full object-cover" /> : <UserIcon className="w-12 h-12 text-neutral-300" />}
-                </div>
-                {/* Camera button removed [UX-07] - use photo URL field instead */}
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>الاسم المعروض</Label>
-              <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} required />
-            </div>
-            <div className="space-y-2">
-              <Label>رابط الصورة الشخصية</Label>
-              <Input value={photoURL} onChange={(e) => setPhotoURL(e.target.value)} placeholder="https://..." />
-            </div>
-            <Button type="submit" disabled={isUpdating} className="w-full">حفظ التغييرات</Button>
-          </form>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader><CardTitle className="text-lg">تغيير كلمة المرور</CardTitle></CardHeader>
-        <CardContent>
-          <form onSubmit={handleChangePassword} className="space-y-4">
-            <div className="space-y-2">
-              <Label>كلمة المرور الجديدة</Label>
-              <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required minLength={6} />
-            </div>
-            <Button type="submit" variant="outline" disabled={isUpdating || !newPassword} className="w-full">تحديث كلمة المرور</Button>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}

@@ -9,6 +9,8 @@ export interface AuthUser {
   username: string;
   displayName: string;
   role: 'admin' | 'manager';
+  photoURL?: string | null;
+  permissions?: string[];
 }
 
 export interface AuthRequest extends Request {
@@ -45,4 +47,15 @@ export function requireAdmin(req: AuthRequest, res: Response, next: NextFunction
     return res.status(403).json({ error: 'هذه العملية مخصصة للمسؤولين فقط' });
   }
   next();
+}
+
+// Middleware: require specific granular permission or admin
+export function requirePermission(permission: string) {
+  return (req: AuthRequest, res: Response, next: NextFunction) => {
+    // Admin always overrides permissions, or check exact permission array
+    if (req.user?.role === 'admin' || (req.user?.permissions && req.user.permissions.includes(permission))) {
+      return next();
+    }
+    return res.status(403).json({ error: 'ليس لديك صلاحية الوصول' });
+  };
 }
