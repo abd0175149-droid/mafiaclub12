@@ -349,7 +349,7 @@ export default function Dashboard() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="h-[300px]">
-                  {activeTab === 'overview' && (
+                  {activeTab === 'overview' && !selectedActivity && (
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={[
                         { name: 'مدفوع', count: bookings.filter(b => b.isPaid && !b.isFree).length, color: '#10b981' },
@@ -383,8 +383,8 @@ export default function Dashboard() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {activities.length > 0 ? activities.map(activity => (
-                  <div className="cursor-pointer" key={activity.id} onClick={() => setSelectedActivity(activity)}>
-                    <ActivityCard activity={activity} stats={getActivityStats(activity.id)} onDelete={() => handleDeleteActivity(activity)} onStatusChange={fetchAll} />
+                  <div key={activity.id}>
+                    <ActivityCard activity={activity} stats={getActivityStats(activity.id)} onDelete={() => handleDeleteActivity(activity)} onStatusChange={fetchAll} onSelect={() => setSelectedActivity(activity)} />
                   </div>
                 )) : (
                   <div className="col-span-full text-center py-16 text-neutral-400">
@@ -558,7 +558,7 @@ interface ActivityCardProps {
   onDelete?: () => void;
 }
 
-const ActivityCard: React.FC<ActivityCardProps> = ({ activity, stats, onDelete, onStatusChange }) => {
+const ActivityCard: React.FC<ActivityCardProps> = ({ activity, stats, onDelete, onStatusChange, onSelect }) => {
   return (
     <Card className="border-none shadow-sm hover:shadow-md transition-shadow">
       <CardHeader className="pb-2">
