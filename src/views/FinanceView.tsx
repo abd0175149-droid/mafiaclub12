@@ -170,7 +170,7 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
                        <TableCell className="font-bold">{t.amount} د.أ</TableCell>
                        <TableCell>
                          {isAdmin && t.type === 'expense' && (
-                            <Button variant="ghost" size="icon" className="text-rose-500 hover:bg-rose-50" onClick={() => handleDeleteCost(t.rawId)}>
+                            <Button variant="ghost" size="icon" className="text-rose-500 hover:bg-rose-50" onClick={(e) => { e.stopPropagation(); handleDeleteCost(t.rawId); }}>
                               <Trash2 className="w-4 h-4" />
                             </Button>
                          )}
@@ -224,7 +224,7 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
                       </TableCell>
                       <TableCell>
                          {isAdmin && (
-                            <Button variant="ghost" size="icon" className="text-rose-500" onClick={() => handleDeleteFoundational(cost.id)}>
+                            <Button variant="ghost" size="icon" className="text-rose-500" onClick={(e) => { e.stopPropagation(); handleDeleteFoundational(cost.id); }}>
                               <Trash2 className="w-4 h-4" />
                             </Button>
                          )}

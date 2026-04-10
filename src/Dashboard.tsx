@@ -381,8 +381,8 @@ export default function Dashboard() {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {activities.length > 0 ? activities.map(activity => (
-                    <div className="cursor-pointer" key={activity.id}>
-                      <ActivityCard activity={activity} stats={getActivityStats(activity.id)} onDelete={() => handleDeleteActivity(activity)} onSelect={() => setSelectedActivity(activity)} />
+                    <div className="cursor-pointer" key={activity.id} onClick={() => setSelectedActivity(activity)}>
+                      <ActivityCard activity={activity} stats={getActivityStats(activity.id)} onDelete={() => handleDeleteActivity(activity)} />
                     </div>
                   )) : (
                     <div className="col-span-full text-center py-16 text-neutral-400">
@@ -595,7 +595,7 @@ const ActivityCard: React.FC<ActivityCardProps> = ({ activity, stats, onDelete }
         <div className="flex items-center gap-2 pt-2 border-t border-neutral-100">
           <Select
             value={activity.status}
-            onValueChange={(v) => updateDoc(doc(db, 'activities', activity.id), { status: v })}
+            onValueChange={async (v) => { try { await fetch('/api/activities/' + activity.id, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('token') }, body: JSON.stringify({ status: v }) }); if(typeof window !== 'undefined') window.location.reload(); } catch(e){} }}
           >
             <SelectTrigger className="h-8 text-xs flex-1">
               <SelectValue />
@@ -608,7 +608,7 @@ const ActivityCard: React.FC<ActivityCardProps> = ({ activity, stats, onDelete }
             </SelectContent>
           </Select>
           {onDelete && (
-            <Button variant="ghost" size="icon" className="text-rose-500 h-8 w-8" onClick={onDelete}>
+            <Button variant="ghost" size="icon" className="text-rose-500 h-8 w-8" onClick={(e) => { e.stopPropagation(); onDelete && onDelete(); }}>
               <Trash2 className="w-4 h-4" />
             </Button>
           )}
@@ -1223,7 +1223,7 @@ function FoundationalCostsTab({ costs }: { costs: FoundationalCost[] }) {
                 <TableCell>{format(safeDate(c.date)!, 'yyyy/MM/dd')}</TableCell>
                 <TableCell className="text-left">
                   <Button variant="ghost" size="icon-sm" className="text-rose-500" onClick={() => {
-                    if (window.confirm('هل تريد حذف هذه التكلفة التأسيسية؟')) deleteDoc(doc(db, 'foundationalCosts', c.id));
+                    if (window.confirm('هل تريد حذف هذه التكلفة التأسيسية؟')) { apiDelete('/foundational/' + c.id).then(() => window.location.reload()).catch(e => console.error(e)); }
                   }}><Trash2 className="w-4 h-4" /></Button>
                 </TableCell>
               </TableRow>
