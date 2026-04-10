@@ -1,0 +1,150 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Security Model — Mafia Club Dashboard
+    // ===============================================================
+    //
+    // [SEC-01] FIXED: Removed isLocalOrAuthenticated() which returned true always.
+    // [SEC-05] FIXED: Removed hardcoded admin emails from rules.
+    // All access now requires proper Firebase Authentication.
+    //
+    // Authentication flow:
+    // - Admins: Google Sign-In → user doc created with role='admin'
+    // - Staff: Anonymous Auth via server custom token → user doc with role from staff record
+    //
+    // ===============================================================
+
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+        getUserRole() == 'admin';
+    }
+
+    function isManager() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+        getUserRole() in ['manager', 'admin'];
+    }
+
+    function isValidActivity(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() < 200 &&
+             data.basePrice is number && data.basePrice >= 0 &&
+             data.status in ['planned', 'active', 'completed', 'cancelled'];
+    }
+
+    function isValidBooking(data) {
+      return data.activityId is string &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.count is number && data.count > 0 &&
+             data.isPaid is bool &&
+             data.isFree is bool;
+    }
+
+    function isValidCost(data) {
+      return data.item is string && data.item.size() > 0 && data.item.size() < 200 &&
+             data.amount is number && data.amount >= 0 &&
+             data.paidBy is string &&
+             data.type in ['activity', 'general'];
+    }
+
+    function isValidFoundationalCost(data) {
+      return data.item is string && data.item.size() > 0 &&
+             data.amount is number && data.amount >= 0 &&
+             data.paidBy is string &&
+             data.source is string;
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // [SEC-03] Staff — read/write ONLY via Admin SDK (server-side)
+    match /staff/{staffId} {
+      allow read: if false;
+      allow write: if false;
+    }
+
+    // Config — admin emails and app settings
+    match /config/{configId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Login Attempts — rate limiting (managed by server)
+    match /loginAttempts/{attemptId} {
+      allow read, write: if false;
+    }
+
+    // Audit Log — write-only from client, read only by admins
+    match /auditLog/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated();
+      allow update, delete: if false;
+    }
+
+    // Activities
+    match /activities/{activityId} {
+      allow read: if isManager();
+      allow create: if isManager() && isValidActivity(request.resource.data);
+      allow update: if isManager() && isValidActivity(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    // Bookings
+    match /bookings/{bookingId} {
+      allow read: if isManager();
+      allow create: if isManager() && isValidBooking(request.resource.data);
+      allow update: if isManager() && isValidBooking(request.resource.data);
+      allow delete: if isManager();
+    }
+
+    // Costs
+    match /costs/{costId} {
+      allow read: if isManager();
+      allow create: if isManager() && isValidCost(request.resource.data);
+      allow update: if isManager() && isValidCost(request.resource.data);
+      allow delete: if isManager();
+    }
+
+    // Foundational Costs
+    match /foundationalCosts/{costId} {
+      allow read: if isManager();
+      allow create: if isAdmin() && isValidFoundationalCost(request.resource.data);
+      allow update: if isAdmin() && isValidFoundationalCost(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    // Notifications — users can only access their own
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      allow delete: if isAuthenticated() && request.auth.uid == resource.data.userId;
+    }
+
+    // User Settings — users can only access their own
+    match /userSettings/{userId} {
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      allow write: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Users — profile data
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isManager());
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow update: if (isAuthenticated() && request.auth.uid == userId) || isAdmin();
+      allow delete: if isAdmin();
+    }
+  }
+}

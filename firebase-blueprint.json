@@ -1,0 +1,139 @@
+{
+  "entities": {
+    "Activity": {
+      "title": "Activity",
+      "description": "A mafia game session or event",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Name of the activity" },
+        "date": { "type": "string", "format": "date-time", "description": "When the activity takes place" },
+        "description": { "type": "string", "description": "Details about the activity" },
+        "basePrice": { "type": "number", "description": "Standard price per person" },
+        "status": { "type": "string", "enum": ["planned", "active", "completed", "cancelled"], "description": "Current status of the activity" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "date", "basePrice", "status"]
+    },
+    "Booking": {
+      "title": "Booking",
+      "description": "A reservation for an activity",
+      "type": "object",
+      "properties": {
+        "activityId": { "type": "string", "description": "Reference to the activity" },
+        "name": { "type": "string", "description": "Name of the person who booked" },
+        "phone": { "type": "string", "description": "Contact phone number" },
+        "count": { "type": "number", "description": "Number of people in the group" },
+        "isPaid": { "type": "boolean", "description": "Whether the payment was received" },
+        "paidAmount": { "type": "number", "description": "Amount actually paid" },
+        "receivedBy": { "type": "string", "description": "Who collected the payment" },
+        "isFree": { "type": "boolean", "description": "Whether this is a complimentary entry" },
+        "notes": { "type": "string", "description": "Any additional notes" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["activityId", "name", "count", "isPaid", "isFree"]
+    },
+    "Cost": {
+      "title": "Cost",
+      "description": "An expense record",
+      "type": "object",
+      "properties": {
+        "activityId": { "type": "string", "description": "Optional reference to a specific activity" },
+        "item": { "type": "string", "description": "What the money was spent on" },
+        "amount": { "type": "number", "description": "Cost amount" },
+        "date": { "type": "string", "format": "date-time", "description": "When the cost was incurred" },
+        "paidBy": { "type": "string", "description": "Who paid the amount" },
+        "type": { "type": "string", "enum": ["activity", "general"], "description": "Whether it's linked to a specific activity or general overhead" }
+      },
+      "required": ["item", "amount", "date", "paidBy", "type"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "System alerts for managers",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string", "enum": ["new_booking", "upcoming_activity", "cost_alert"] },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "userId": { "type": "string", "description": "Target user ID" }
+      },
+      "required": ["title", "message", "type", "read", "createdAt", "userId"]
+    },
+    "UserSettings": {
+      "title": "User Settings",
+      "description": "Manager preferences",
+      "type": "object",
+      "properties": {
+        "notifications": {
+          "type": "object",
+          "properties": {
+            "newBooking": { "type": "boolean" },
+            "upcomingActivity": { "type": "boolean" },
+            "costAlert": { "type": "boolean" }
+          }
+        },
+        "dashboardLayout": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "FoundationalCost": {
+      "title": "Foundational Cost",
+      "description": "Initial setup expenses",
+      "type": "object",
+      "properties": {
+        "item": { "type": "string" },
+        "amount": { "type": "number" },
+        "paidBy": { "type": "string" },
+        "source": { "type": "string", "description": "Where the money came from (e.g., Personal, Loan)" },
+        "date": { "type": "string", "format": "date-time" }
+      },
+      "required": ["item", "amount", "paidBy", "source", "date"]
+    },
+    "User": {
+      "title": "User",
+      "description": "Application user profile and role",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "manager"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "role"]
+    }
+  },
+  "firestore": {
+    "/activities/{activityId}": {
+      "schema": "Activity",
+      "description": "Collection of mafia game sessions"
+    },
+    "/bookings/{bookingId}": {
+      "schema": "Booking",
+      "description": "Collection of participant bookings"
+    },
+    "/costs/{costId}": {
+      "schema": "Cost",
+      "description": "Collection of expense records"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "System notifications"
+    },
+    "/userSettings/{userId}": {
+      "schema": "UserSettings",
+      "description": "User specific preferences"
+    },
+    "/foundationalCosts/{costId}": {
+      "schema": "FoundationalCost",
+      "description": "Initial setup expenses"
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles and roles"
+    }
+  }
+}
