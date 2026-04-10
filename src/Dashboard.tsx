@@ -348,7 +348,8 @@ export default function Dashboard() {
                       <PieChartIcon className="w-5 h-5" /> حالة الحجوزات
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="h-[300px]" style={{ minWidth: 200, minHeight: 200 }}>
+                  <CardContent className="h-[300px]">
+                    {activeTab === 'overview' && (
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={[
                         { name: 'مدفوع', count: bookings.filter(b => b.isPaid && !b.isFree).length, color: '#10b981' },
@@ -365,6 +366,7 @@ export default function Dashboard() {
                         </Bar>
                       </BarChart>
                     </ResponsiveContainer>
+                    )}
                   </CardContent>
                 </Card>
               </div>
