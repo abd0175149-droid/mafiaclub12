@@ -32,8 +32,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { 
-  Plus, Users, DollarSign, Calendar as CalendarIcon, TrendingUp, TrendingDown, 
+import {
+  Plus, Users, DollarSign, Calendar as CalendarIcon, TrendingUp, TrendingDown,
   Trash2, Pencil, CheckCircle2, Clock, Bell, Settings as SettingsIcon,
   LayoutDashboard, AlertTriangle, Info, Check, PieChart as PieChartIcon,
   Building2, User as UserIcon, LogOut, Shield, Key, Menu, X
@@ -171,7 +171,7 @@ export default function Dashboard() {
 
   if (selectedActivity) {
     return (
-      <ActivityDetails 
+      <ActivityDetails
         activity={selectedActivity}
         location={locations.find(l => l.id == selectedActivity.locationId) || null}
         bookings={bookings}
@@ -185,172 +185,172 @@ export default function Dashboard() {
     <div className="flex h-screen bg-neutral-50 overflow-hidden relative" dir="rtl">
       {/* Mobile Overlay */}
       {isMobileMenuOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-40 md:hidden" 
-          onClick={() => setIsMobileMenuOpen(false)} 
+        <div
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
         />
       )}
 
       {/* Sidebar Navigation */}
       <aside className={`bg-neutral-900 border-l border-neutral-800 text-white w-64 flex-shrink-0 flex flex-col transition-all duration-300 md:relative md:flex ${isMobileMenuOpen ? 'fixed inset-y-0 right-0 z-50 flex' : 'hidden'}`}>
-         <div className="p-6 flex items-center gap-3 border-b border-neutral-800">
-           <div className="bg-neutral-800 p-2.5 rounded-xl text-white shadow-lg">
-             <Shield className="w-6 h-6 text-emerald-400" />
-           </div>
-           <div>
-             <h1 className="text-lg font-bold tracking-tight leading-tight">Mafia Club</h1>
-             <p className="text-neutral-400 text-xs text-right">لوحة الإدارة</p>
-           </div>
-         </div>
-         
-         <nav className="flex-1 overflow-y-auto p-4 space-y-2">
-            {[
-              { id: 'overview', icon: LayoutDashboard, label: 'نظرة عامة', reqPerm: null },
-              { id: 'activities', icon: CalendarIcon, label: 'الأنشطة المجدولة', reqPerm: 'activities' },
-              { id: 'bookings', icon: Users, label: 'قاعدة الحجوزات', reqPerm: 'bookings' },
-              { id: 'finances', icon: DollarSign, label: 'المالية الشاملة', reqPerm: 'finances' },
-              { id: 'locations', icon: PieChartIcon, label: 'أماكن الفعاليات', reqPerm: 'locations' },
-            ].map(tc => {
-              const hasPerm = isAdmin || !tc.reqPerm || (Array.isArray(profile?.permissions) && profile.permissions.includes(tc.reqPerm));
-              if (!hasPerm) return null;
-              return (
-                <button 
-                  key={tc.id} 
-                  onClick={() => { setActiveTab(tc.id); setIsMobileMenuOpen(false); }} 
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === tc.id ? 'bg-neutral-800 text-white shadow-md border border-neutral-700/50' : 'text-neutral-400 hover:bg-neutral-800/50 hover:text-white'}`}
-                >
-                  <tc.icon className="w-5 h-5 flex-shrink-0" />
-                  <span className="font-bold text-sm">{tc.label}</span>
-                </button>
-              );
-            })}
-            {isAdmin && (
-              <button 
-                onClick={() => { setActiveTab('users'); setIsMobileMenuOpen(false); }} 
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'users' ? 'bg-neutral-800 text-white shadow-md border border-neutral-700/50' : 'text-neutral-400 hover:bg-neutral-800/50 hover:text-white'}`}
+        <div className="p-6 flex items-center gap-3 border-b border-neutral-800">
+          <div className="bg-neutral-800 p-2.5 rounded-xl text-white shadow-lg">
+            <Shield className="w-6 h-6 text-emerald-400" />
+          </div>
+          <div>
+            <h1 className="text-lg font-bold tracking-tight leading-tight">Mafia Club</h1>
+            <p className="text-neutral-400 text-xs text-right">لوحة الإدارة</p>
+          </div>
+        </div>
+
+        <nav className="flex-1 overflow-y-auto p-4 space-y-2">
+          {[
+            { id: 'overview', icon: LayoutDashboard, label: 'نظرة عامة', reqPerm: null },
+            { id: 'activities', icon: CalendarIcon, label: 'الأنشطة المجدولة', reqPerm: 'activities' },
+            { id: 'bookings', icon: Users, label: 'قاعدة الحجوزات', reqPerm: 'bookings' },
+            { id: 'finances', icon: DollarSign, label: 'المالية الشاملة', reqPerm: 'finances' },
+            { id: 'locations', icon: PieChartIcon, label: 'أماكن الفعاليات', reqPerm: 'locations' },
+          ].map(tc => {
+            const hasPerm = isAdmin || !tc.reqPerm || (Array.isArray(profile?.permissions) && profile.permissions.includes(tc.reqPerm));
+            if (!hasPerm) return null;
+            return (
+              <button
+                key={tc.id}
+                onClick={() => { setActiveTab(tc.id); setIsMobileMenuOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === tc.id ? 'bg-neutral-800 text-white shadow-md border border-neutral-700/50' : 'text-neutral-400 hover:bg-neutral-800/50 hover:text-white'}`}
               >
-                <Shield className="w-5 h-5 flex-shrink-0 text-emerald-400" />
-                <span className="font-bold text-sm text-emerald-400">إدارة الإداريين</span>
+                <tc.icon className="w-5 h-5 flex-shrink-0" />
+                <span className="font-bold text-sm">{tc.label}</span>
               </button>
-            )}
-         </nav>
+            );
+          })}
+          {isAdmin && (
+            <button
+              onClick={() => { setActiveTab('users'); setIsMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'users' ? 'bg-neutral-800 text-white shadow-md border border-neutral-700/50' : 'text-neutral-400 hover:bg-neutral-800/50 hover:text-white'}`}
+            >
+              <Shield className="w-5 h-5 flex-shrink-0 text-emerald-400" />
+              <span className="font-bold text-sm text-emerald-400">إدارة الإداريين</span>
+            </button>
+          )}
+        </nav>
       </aside>
 
       {/* Main Content Area */}
       <main className="flex-1 overflow-y-auto w-full min-w-0 bg-neutral-50/50 relative">
-         {/* Top Navbar */}
-         <header className="bg-white border-b border-neutral-200 p-4 sticky top-0 z-30 shadow-sm flex items-center justify-between">
-            <div className="flex items-center gap-4 w-full justify-between md:justify-end flex-row-reverse md:flex-row">
-              {/* Mobile Branding inside Navbar */}
-              <div className="flex items-center gap-2 md:hidden">
-                <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(true)}>
-                  <Menu className="w-6 h-6 text-neutral-900" />
-                </Button>
-                <span className="font-bold text-lg text-neutral-900 ml-2">Mafia Club</span>
-              </div>
-              
-              {/* Desktop/Mobile User Controls */}
-              <div className="flex items-center gap-3 dir-ltr">
-                 <NotificationCenter notifications={notifications} />
-                 <div className="h-6 w-px bg-neutral-200 mx-1"></div>
-                 <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" className="flex items-center gap-2 rounded-full px-2 py-1.5 hover:bg-neutral-50 border border-transparent hover:border-neutral-200 transition-all">
-                        <div className="text-right hidden sm:block mr-2">
-                          <p className="text-sm font-bold leading-none text-neutral-800">{profile?.displayName || 'مستخدم'}</p>
-                          <p className="text-[11px] text-neutral-500 mt-0.5">{isAdmin ? 'مسؤول' : 'مدير'}</p>
-                        </div>
-                        <div className="w-9 h-9 rounded-full bg-neutral-100 flex items-center justify-center overflow-hidden border border-neutral-200 shrink-0">
-                          {profile?.photoURL ? <img src={profile.photoURL} alt="" className="w-full h-full object-cover" /> : <UserIcon className="w-5 h-5 text-neutral-500" />}
-                        </div>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56 mt-1 font-sans" dir="rtl">
-                      <DropdownMenuItem className="cursor-pointer py-2.5" onClick={() => { setActiveTab('profile'); setIsMobileMenuOpen(false); }}>
-                        <SettingsIcon className="w-4 h-4 ml-2" /> إعدادات الحساب
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem className="cursor-pointer text-rose-600 focus:bg-rose-50 py-2.5" onClick={() => logout()}>
-                        <LogOut className="w-4 h-4 ml-2" /> تسجيل الخروج
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                 </DropdownMenu>
-              </div>
+        {/* Top Navbar */}
+        <header className="bg-white border-b border-neutral-200 p-4 sticky top-0 z-30 shadow-sm flex items-center justify-between">
+          <div className="flex items-center gap-4 w-full justify-between md:justify-end flex-row-reverse md:flex-row">
+            {/* Mobile Branding inside Navbar */}
+            <div className="flex items-center gap-2 md:hidden">
+              <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(true)}>
+                <Menu className="w-6 h-6 text-neutral-900" />
+              </Button>
+              <span className="font-bold text-lg text-neutral-900 ml-2">Mafia Club</span>
             </div>
-         </header>
 
-         <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
-            
-            <div className={activeTab === 'overview' ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
-              <h2 className="text-2xl font-bold mb-6">نظرة عامة والتحليلات</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {settings?.dashboardLayout.includes('revenue') && (
-                  <KPICard title="إجمالي الإيرادات" value={`${totalRevenue.toLocaleString()} د.أ`} icon={<TrendingUp className="text-emerald-500" />} subtitle={`من ${bookings.length} حجز`} />
-                )}
-                {settings?.dashboardLayout.includes('costs') && (
-                  <KPICard title="إجمالي التكاليف" value={`${totalCosts.toLocaleString()} د.أ`} icon={<TrendingDown className="text-rose-500" />} subtitle="تكاليف عامة وأنشطة" />
-                )}
-                {settings?.dashboardLayout.includes('profit') && (
-                  <KPICard title="صافي الربح" value={`${netProfit.toLocaleString()} د.أ`} icon={<DollarSign className="text-blue-500" />} subtitle="بعد خصم المصاريف" trend={netProfit >= 0 ? 'up' : 'down'} />
-                )}
-                {settings?.dashboardLayout.includes('bookings') && (
-                  <KPICard title="الحجوزات النشطة" value={activeBookingsCount.toString()} icon={<Users className="text-amber-500" />} subtitle="للأنشطة القادمة" />
-                )}
-              </div>
+            {/* Desktop/Mobile User Controls */}
+            <div className="flex items-center gap-3 dir-ltr">
+              <NotificationCenter notifications={notifications} />
+              <div className="h-6 w-px bg-neutral-200 mx-1"></div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="flex items-center gap-2 rounded-full px-2 py-1.5 hover:bg-neutral-50 border border-transparent hover:border-neutral-200 transition-all">
+                    <div className="text-right hidden sm:block mr-2">
+                      <p className="text-sm font-bold leading-none text-neutral-800">{profile?.displayName || 'مستخدم'}</p>
+                      <p className="text-[11px] text-neutral-500 mt-0.5">{isAdmin ? 'مسؤول' : 'مدير'}</p>
+                    </div>
+                    <div className="w-9 h-9 rounded-full bg-neutral-100 flex items-center justify-center overflow-hidden border border-neutral-200 shrink-0">
+                      {profile?.photoURL ? <img src={profile.photoURL} alt="" className="w-full h-full object-cover" /> : <UserIcon className="w-5 h-5 text-neutral-500" />}
+                    </div>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56 mt-1 font-sans" dir="rtl">
+                  <DropdownMenuItem className="cursor-pointer py-2.5" onClick={() => { setActiveTab('profile'); setIsMobileMenuOpen(false); }}>
+                    <SettingsIcon className="w-4 h-4 ml-2" /> إعدادات الحساب
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem className="cursor-pointer text-rose-600 focus:bg-rose-50 py-2.5" onClick={() => logout()}>
+                    <LogOut className="w-4 h-4 ml-2" /> تسجيل الخروج
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+        </header>
 
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
-                {/* Upcoming Activities */}
-                <Card className="lg:col-span-2 border-none shadow-sm">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <CalendarIcon className="w-5 h-5" /> الأنشطة القادمة
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {upcomingActivities.length > 0 ? upcomingActivities.map(activity => {
-                        const stats = getActivityStats(activity.id);
-                        return (
-                          <div key={activity.id} className="flex items-center justify-between p-4 bg-white border border-neutral-100 rounded-xl hover:border-neutral-300 transition-all">
-                            <div className="flex items-center gap-4">
-                              <div className="bg-neutral-900 text-white p-3 rounded-lg text-center min-w-[60px]">
-                                <div className="text-xs uppercase">{format(safeDate(activity.date)!, 'MMM')}</div>
-                                <div className="text-xl font-bold">{format(safeDate(activity.date)!, 'dd')}</div>
-                              </div>
-                              <div>
-                                <h4 className="font-bold text-neutral-900">{activity.name}</h4>
-                                <p className="text-sm text-neutral-500">{format(safeDate(activity.date)!, 'hh:mm a')}</p>
-                              </div>
+        <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
+
+          <div className={activeTab === 'overview' ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
+            <h2 className="text-2xl font-bold mb-6">نظرة عامة والتحليلات</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {settings?.dashboardLayout.includes('revenue') && (
+                <KPICard title="إجمالي الإيرادات" value={`${totalRevenue.toLocaleString()} د.أ`} icon={<TrendingUp className="text-emerald-500" />} subtitle={`من ${bookings.length} حجز`} />
+              )}
+              {settings?.dashboardLayout.includes('costs') && (
+                <KPICard title="إجمالي التكاليف" value={`${totalCosts.toLocaleString()} د.أ`} icon={<TrendingDown className="text-rose-500" />} subtitle="تكاليف عامة وأنشطة" />
+              )}
+              {settings?.dashboardLayout.includes('profit') && (
+                <KPICard title="صافي الربح" value={`${netProfit.toLocaleString()} د.أ`} icon={<DollarSign className="text-blue-500" />} subtitle="بعد خصم المصاريف" trend={netProfit >= 0 ? 'up' : 'down'} />
+              )}
+              {settings?.dashboardLayout.includes('bookings') && (
+                <KPICard title="الحجوزات النشطة" value={activeBookingsCount.toString()} icon={<Users className="text-amber-500" />} subtitle="للأنشطة القادمة" />
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
+              {/* Upcoming Activities */}
+              <Card className="lg:col-span-2 border-none shadow-sm">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <CalendarIcon className="w-5 h-5" /> الأنشطة القادمة
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {upcomingActivities.length > 0 ? upcomingActivities.map(activity => {
+                      const stats = getActivityStats(activity.id);
+                      return (
+                        <div key={activity.id} className="flex items-center justify-between p-4 bg-white border border-neutral-100 rounded-xl hover:border-neutral-300 transition-all">
+                          <div className="flex items-center gap-4">
+                            <div className="bg-neutral-900 text-white p-3 rounded-lg text-center min-w-[60px]">
+                              <div className="text-xs uppercase">{format(safeDate(activity.date)!, 'MMM')}</div>
+                              <div className="text-xl font-bold">{format(safeDate(activity.date)!, 'dd')}</div>
                             </div>
-                            <div className="flex items-center gap-6">
-                              <div className="text-right">
-                                <p className="text-xs text-neutral-500">الحضور</p>
-                                <p className="font-bold">{stats.attendees}</p>
-                              </div>
-                              <div className="text-right">
-                                <p className="text-xs text-neutral-500">الحالة</p>
-                                <Badge variant="outline" className={STATUS_COLORS[activity.status]}>{STATUS_LABELS[activity.status]}</Badge>
-                              </div>
+                            <div>
+                              <h4 className="font-bold text-neutral-900">{activity.name}</h4>
+                              <p className="text-sm text-neutral-500">{format(safeDate(activity.date)!, 'hh:mm a')}</p>
                             </div>
                           </div>
-                        );
-                      }) : (
-                        <div className="text-center py-8 text-neutral-400">لا توجد أنشطة قادمة حالياً</div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
+                          <div className="flex items-center gap-6">
+                            <div className="text-right">
+                              <p className="text-xs text-neutral-500">الحضور</p>
+                              <p className="font-bold">{stats.attendees}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-xs text-neutral-500">الحالة</p>
+                              <Badge variant="outline" className={STATUS_COLORS[activity.status]}>{STATUS_LABELS[activity.status]}</Badge>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }) : (
+                      <div className="text-center py-8 text-neutral-400">لا توجد أنشطة قادمة حالياً</div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
 
-                {/* Booking Status Chart */}
-                <Card className="border-none shadow-sm">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <PieChartIcon className="w-5 h-5" /> حالة الحجوزات
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {activeTab === 'overview' && (
-                    <ResponsiveContainer width="100%" aspect={2}>
+              {/* Booking Status Chart */}
+              <Card className="border-none shadow-sm">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <PieChartIcon className="w-5 h-5" /> حالة الحجوزات
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="h-[300px]">
+                  {activeTab === 'overview' && (
+                    <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={[
                         { name: 'مدفوع', count: bookings.filter(b => b.isPaid && !b.isFree).length, color: '#10b981' },
                         { name: 'مجاني', count: bookings.filter(b => b.isFree).length, color: '#3b82f6' },
@@ -366,92 +366,92 @@ export default function Dashboard() {
                         </Bar>
                       </BarChart>
                     </ResponsiveContainer>
-                    )}
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+
+          <div className={activeTab === 'activities' ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
+            <div className="space-y-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-2xl font-bold">الأنشطة المجدولة</h2>
+                  <p className="text-neutral-500">إدارة الجلسات والفعاليات</p>
+                </div>
+                <ActivityForm locations={locations} fetchAll={fetchAll} />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {activities.length > 0 ? activities.map(activity => (
+                  <div className="cursor-pointer" key={activity.id} onClick={() => setSelectedActivity(activity)}>
+                    <ActivityCard activity={activity} stats={getActivityStats(activity.id)} onDelete={() => handleDeleteActivity(activity)} />
+                  </div>
+                )) : (
+                  <div className="col-span-full text-center py-16 text-neutral-400">
+                    <CalendarIcon className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                    <p className="text-lg font-medium">لا توجد أنشطة حالياً</p>
+                    <p className="text-sm">ابدأ بإضافة نشاط جديد</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className={activeTab === 'bookings' ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
+            <BookingsTabContent bookings={bookings} activities={activities} />
+          </div>
+
+          <div className={activeTab === 'finances' ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
+            <FinanceView activities={activities} bookings={bookings} costs={costs} foundationalCosts={foundationalCosts} fetchData={fetchAll} />
+          </div>
+
+          <div className={activeTab === 'locations' ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
+            <LocationsView />
+          </div>
+
+          <div className={activeTab === 'profile' ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className="lg:col-span-2">
+                <ProfileTab />
+              </div>
+              <div>
+                <Card className="border-none shadow-sm h-full">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <SettingsIcon className="w-5 h-5 text-neutral-500" /> لوحة التحكم
+                    </CardTitle>
+                    <CardDescription>إعدادات واجهة المستخدم وتفضيلات العرض</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="space-y-4">
+                      <h4 className="font-medium text-sm text-neutral-900 border-b pb-2">عناصر النظرة العامة</h4>
+                      {settings && [
+                        { id: 'revenue', label: 'إجمالي الإيرادات' },
+                        { id: 'costs', label: 'إجمالي التكاليف' },
+                        { id: 'profit', label: 'صافي الربح' },
+                        { id: 'bookings', label: 'الحجوزات النشطة' },
+                      ].map(item => (
+                        <div key={item.id} className="flex items-center justify-between">
+                          <Label className="cursor-pointer">{item.label}</Label>
+                          <Switch
+                            checked={settings.dashboardLayout.includes(item.id)}
+                            onCheckedChange={() => toggleLayoutItem(item.id)}
+                          />
+                        </div>
+                      ))}
+                    </div>
                   </CardContent>
                 </Card>
               </div>
             </div>
+          </div>
 
-            <div className={activeTab === 'activities' ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
-              <div className="space-y-6">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h2 className="text-2xl font-bold">الأنشطة المجدولة</h2>
-                    <p className="text-neutral-500">إدارة الجلسات والفعاليات</p>
-                  </div>
-                  <ActivityForm locations={locations} fetchAll={fetchAll} />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {activities.length > 0 ? activities.map(activity => (
-                    <div className="cursor-pointer" key={activity.id} onClick={() => setSelectedActivity(activity)}>
-                      <ActivityCard activity={activity} stats={getActivityStats(activity.id)} onDelete={() => handleDeleteActivity(activity)} />
-                    </div>
-                  )) : (
-                    <div className="col-span-full text-center py-16 text-neutral-400">
-                      <CalendarIcon className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                      <p className="text-lg font-medium">لا توجد أنشطة حالياً</p>
-                      <p className="text-sm">ابدأ بإضافة نشاط جديد</p>
-                    </div>
-                  )}
-                </div>
-              </div>
+          {isAdmin && (
+            <div className={activeTab === 'users' ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
+              <UserManagementTab users={staff} fetchAll={fetchAll} />
             </div>
-
-            <div className={activeTab === 'bookings' ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
-              <BookingsTabContent bookings={bookings} activities={activities} />
-            </div>
-
-            <div className={activeTab === 'finances' ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
-              <FinanceView activities={activities} bookings={bookings} costs={costs} foundationalCosts={foundationalCosts} fetchData={fetchAll} />
-            </div>
-
-            <div className={activeTab === 'locations' ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
-              <LocationsView />
-            </div>
-
-            <div className={activeTab === 'profile' ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2">
-                  <ProfileTab />
-                </div>
-                <div>
-                  <Card className="border-none shadow-sm h-full">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <SettingsIcon className="w-5 h-5 text-neutral-500" /> لوحة التحكم
-                      </CardTitle>
-                      <CardDescription>إعدادات واجهة المستخدم وتفضيلات العرض</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                      <div className="space-y-4">
-                        <h4 className="font-medium text-sm text-neutral-900 border-b pb-2">عناصر النظرة العامة</h4>
-                        {settings && [
-                          { id: 'revenue', label: 'إجمالي الإيرادات' },
-                          { id: 'costs', label: 'إجمالي التكاليف' },
-                          { id: 'profit', label: 'صافي الربح' },
-                          { id: 'bookings', label: 'الحجوزات النشطة' },
-                        ].map(item => (
-                          <div key={item.id} className="flex items-center justify-between">
-                            <Label className="cursor-pointer">{item.label}</Label>
-                            <Switch 
-                              checked={settings.dashboardLayout.includes(item.id)}
-                              onCheckedChange={() => toggleLayoutItem(item.id)} 
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              </div>
-            </div>
-
-            {isAdmin && (
-              <div className={activeTab === 'users' ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
-                <UserManagementTab users={staff} fetchAll={fetchAll} />
-              </div>
-            )}
-         </div>
+          )}
+        </div>
       </main>
       <Toaster position="top-center" />
     </div>
@@ -515,20 +515,19 @@ function NotificationCenter({ notifications }: { notifications: Notification[] }
         <DropdownMenuSeparator />
         <ScrollArea className="h-[400px]">
           {notifications.length > 0 ? notifications.map(n => (
-            <div 
-              key={n.id} 
+            <div
+              key={n.id}
               className={`p-4 border-b border-neutral-50 hover:bg-neutral-50 transition-colors cursor-pointer ${!n.read ? 'bg-blue-50/30' : ''}`}
               onClick={() => markAsRead(n.id)}
             >
               <div className="flex gap-3">
-                <div className={`p-2 rounded-full h-fit ${
-                  n.type === 'cost_alert' ? 'bg-rose-100 text-rose-600' : 
-                  n.type === 'new_booking' ? 'bg-emerald-100 text-emerald-600' : 
-                  'bg-blue-100 text-blue-600'
-                }`}>
-                  {n.type === 'cost_alert' ? <AlertTriangle className="w-4 h-4" /> : 
-                   n.type === 'new_booking' ? <Users className="w-4 h-4" /> : 
-                   <CalendarIcon className="w-4 h-4" />}
+                <div className={`p-2 rounded-full h-fit ${n.type === 'cost_alert' ? 'bg-rose-100 text-rose-600' :
+                    n.type === 'new_booking' ? 'bg-emerald-100 text-emerald-600' :
+                      'bg-blue-100 text-blue-600'
+                  }`}>
+                  {n.type === 'cost_alert' ? <AlertTriangle className="w-4 h-4" /> :
+                    n.type === 'new_booking' ? <Users className="w-4 h-4" /> :
+                      <CalendarIcon className="w-4 h-4" />}
                 </div>
                 <div className="space-y-1">
                   <p className={`text-sm font-bold ${!n.read ? 'text-neutral-900' : 'text-neutral-600'}`}>{n.title}</p>
@@ -593,7 +592,7 @@ const ActivityCard: React.FC<ActivityCardProps> = ({ activity, stats, onDelete }
         <div className="flex items-center gap-2 pt-2 border-t border-neutral-100" onClick={(e) => e.stopPropagation()}>
           <Select
             value={activity.status}
-            onValueChange={async (v) => { try { await apiPut('/activities/' + activity.id, { status: v }); window.location.reload(); } catch(e) { console.error(e); } }}
+            onValueChange={async (v) => { try { await apiPut('/activities/' + activity.id, { status: v }); window.location.reload(); } catch (e) { console.error(e); } }}
           >
             <SelectTrigger className="h-8 text-xs flex-1">
               <SelectValue />
@@ -812,7 +811,7 @@ function ActivityForm({ locations, fetchAll }: { locations: Location[], fetchAll
     try {
       const name = formData.get('name') as string;
       const locationId = formData.get('locationId') as string;
-      
+
       await apiPost('/activities', {
         name,
         date: new Date(formData.get('date') as string).toISOString(),
@@ -903,7 +902,7 @@ function BookingForm({ activities }: { activities: Activity[] }) {
     const count = Number(formData.get('count'));
     const isPaid = formData.get('isPaid') === 'true';
     const name = formData.get('name') as string;
-    
+
     try {
       await addDoc(collection(db, 'bookings'), {
         activityId,
@@ -982,7 +981,7 @@ function BookingForm({ activities }: { activities: Activity[] }) {
               </Select>
             </div>
           </div>
-          
+
           {!isFree && (
             <>
               <div className="grid grid-cols-2 gap-4">
@@ -1009,7 +1008,7 @@ function BookingForm({ activities }: { activities: Activity[] }) {
               </div>
             </>
           )}
-          
+
           <div className="space-y-2">
             <Label>ملاحظات</Label>
             <Input name="notes" />
@@ -1053,7 +1052,7 @@ function CostForm({ activities, bookings, costs }: { activities: Activity[], boo
           const activityBookings = bookings.filter(b => b.activityId === activityId);
           const revenue = activityBookings.reduce((sum, b) => sum + (b.isPaid ? b.paidAmount : 0), 0);
           const currentCosts = costs.filter(c => c.activityId === activityId).reduce((sum, c) => sum + c.amount, 0) + amount;
-          
+
           if (currentCosts > revenue && revenue > 0) {
             await createNotification(user.uid, 'تنبيه تكاليف', `تجاوزت تكاليف نشاط ${activity.name} إجمالي الإيرادات المحققة!`, 'cost_alert');
           }
