@@ -29,7 +29,8 @@ export async function api<T = any>(path: string, options?: RequestInit): Promise
     headers
   });
 
-  if (res.status === 401) {
+  // If token is expired (401) or too large (431), clear it and force re-login
+  if (res.status === 401 || res.status === 431) {
     clearToken();
     window.location.reload();
     throw new Error('جلسة منتهية');

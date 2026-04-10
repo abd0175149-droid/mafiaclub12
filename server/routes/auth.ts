@@ -33,17 +33,21 @@ router.post('/login', (req, res) => {
     username: user.username,
     displayName: user.displayName,
     role: user.role,
-    photoURL: user.photoURL,
     permissions
   };
 
   const token = generateToken(tokenPayload);
-  res.json({ token, profile: tokenPayload });
+  // Return photoURL separately (not in JWT to avoid 431 header too large)
+  res.json({ token, profile: { ...tokenPayload, photoURL: user.photoURL || null } });
 });
 
-// GET /api/auth/me
+// GET /api/auth/me - fetch fresh profile from DB (includes photoURL)
 router.get('/me', requireAuth, (req: AuthRequest, res) => {
-  res.json({ profile: req.user });
+  const user = db.prepare('SELECT id, username, displayName, role, photoURL, permissions FROM staff WHERE id = ?').get(req.user!.id) as any;
+  if (!user) return res.status(404).json({ error: 'المستخدم غير موجود' });
+  let permissions = [];
+  try { permissions = user.permissions ? JSON.parse(user.permissions) : []; } catch { permissions = []; }
+  res.json({ profile: { ...user, permissions, photoURL: user.photoURL || null } });
 });
 
 export default router;
