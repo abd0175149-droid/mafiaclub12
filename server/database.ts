@@ -85,6 +85,14 @@ db.exec(`
     dashboardLayout TEXT DEFAULT '["revenue","costs","profit","bookings","upcoming"]'
   );
 
+  CREATE TABLE IF NOT EXISTS locations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    mapUrl TEXT DEFAULT '',
+    offers TEXT DEFAULT '[]',
+    createdAt TEXT DEFAULT (datetime('now'))
+  );
+
   CREATE TABLE IF NOT EXISTS audit_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     userId INTEGER,
@@ -95,6 +103,11 @@ db.exec(`
     timestamp TEXT DEFAULT (datetime('now'))
   );
 `);
+
+// Safe migrations for existing tables
+try { db.exec('ALTER TABLE activities ADD COLUMN locationId INTEGER REFERENCES locations(id) ON DELETE SET NULL'); } catch (e) { /* Column already exists */ }
+try { db.exec('ALTER TABLE activities ADD COLUMN driveLink TEXT DEFAULT ""'); } catch (e) { /* Column already exists */ }
+
 
 // Seed default admin if none exists
 const adminExists = db.prepare('SELECT id FROM staff WHERE role = ?').get('admin');

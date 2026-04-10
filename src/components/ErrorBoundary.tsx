@@ -46,7 +46,7 @@ export class ErrorBoundary extends React.Component<
                 إعادة تحميل الصفحة
               </button>
               <button
-                onClick={() => this.setState({ hasError: false })}
+                onClick={() => (this as any).setState({ hasError: false })}
                 className="px-6 py-2.5 border border-neutral-300 rounded-lg hover:bg-neutral-100 transition-colors text-sm font-medium"
               >
                 المحاولة مرة أخرى
@@ -57,6 +57,6 @@ export class ErrorBoundary extends React.Component<
       );
     }
 
-    return this.props.children;
+    return (this as any).props.children;
   }
 }

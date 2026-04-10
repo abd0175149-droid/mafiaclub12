@@ -42,7 +42,7 @@ router.post('/', requireAuth, (req: AuthRequest, res) => {
     'INSERT INTO bookings (activityId, name, phone, count, isPaid, paidAmount, receivedBy, isFree, notes) VALUES (?,?,?,?,?,?,?,?,?)'
   ).run(activityId, name, phone || '', count || 1, isPaid ? 1 : 0, paidAmount || 0, receivedBy || '', isFree ? 1 : 0, notes || '');
 
-  logAudit(req.user!.id, 'create', 'bookings', result.lastInsertRowid);
+  logAudit(req.user!.id, 'create', 'bookings', result.lastInsertRowid.toString());
 
   // Notify all admins
   const admins = db.prepare('SELECT id FROM staff WHERE role = ?').all('admin') as any[];

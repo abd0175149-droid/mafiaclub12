@@ -1,3 +1,11 @@
+export interface Location {
+  id: string | number;
+  name: string;
+  mapUrl?: string;
+  offers: string[];
+  createdAt?: string;
+}
+
 export interface Activity {
   id: string | number;
   name: string;
@@ -5,6 +13,8 @@ export interface Activity {
   description: string;
   basePrice: number;
   status: 'planned' | 'active' | 'completed' | 'cancelled';
+  locationId?: string | number | null;
+  driveLink?: string;
   createdAt: string;
 }
 

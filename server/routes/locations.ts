@@ -1,0 +1,58 @@
+import { Router } from 'express';
+import db, { logAudit } from '../database.js';
+import { requireAuth, requireAdmin, type AuthRequest } from '../middleware/auth.js';
+
+const router = Router();
+
+// GET /api/locations
+router.get('/', requireAuth, (req, res) => {
+  const locations = db.prepare('SELECT * FROM locations ORDER BY id DESC').all();
+  // Parse offers back to real arrays
+  locations.forEach((loc: any) => {
+    try {
+      loc.offers = JSON.parse(loc.offers);
+    } catch {
+      loc.offers = [];
+    }
+  });
+  res.json(locations);
+});
+
+// POST /api/locations
+router.post('/', requireAdmin, (req: AuthRequest, res) => {
+  const { name, mapUrl, offers } = req.body;
+  if (!name) return res.status(400).json({ error: 'Name is required' });
+
+  const offersStr = JSON.stringify(Array.isArray(offers) ? offers : []);
+
+  const info = db.prepare('INSERT INTO locations (name, mapUrl, offers) VALUES (?, ?, ?)').run(
+    name, mapUrl || '', offersStr
+  );
+  logAudit(req.user!.id, 'CREATE', 'locations', Number(info.lastInsertRowid));
+  res.status(201).json({ id: Number(info.lastInsertRowid), name, mapUrl, offers: JSON.parse(offersStr) });
+});
+
+// PUT /api/locations/:id
+router.put('/:id', requireAdmin, (req: AuthRequest, res) => {
+  const { name, mapUrl, offers } = req.body;
+  const id = req.params.id;
+  if (!name) return res.status(400).json({ error: 'Name is required' });
+
+  const offersStr = JSON.stringify(Array.isArray(offers) ? offers : []);
+
+  db.prepare('UPDATE locations SET name = ?, mapUrl = ?, offers = ? WHERE id = ?').run(
+    name, mapUrl || '', offersStr, id
+  );
+  logAudit(req.user!.id, 'UPDATE', 'locations', id);
+  res.json({ success: true });
+});
+
+// DELETE /api/locations/:id
+router.delete('/:id', requireAdmin, (req: AuthRequest, res) => {
+  const id = req.params.id;
+  db.prepare('DELETE FROM locations WHERE id = ?').run(id);
+  logAudit(req.user!.id, 'DELETE', 'locations', id);
+  res.json({ success: true });
+});
+
+export default router;

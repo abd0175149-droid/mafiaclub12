@@ -15,6 +15,7 @@ import foundationalRoutes from './server/routes/foundational.js';
 import staffRoutes from './server/routes/staff.js';
 import notificationsRoutes from './server/routes/notifications.js';
 import settingsRoutes from './server/routes/settings.js';
+import locationsRoutes from './server/routes/locations.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -34,6 +35,7 @@ async function startServer() {
   app.use('/api/staff', staffRoutes);
   app.use('/api/notifications', notificationsRoutes);
   app.use('/api/settings', settingsRoutes);
+  app.use('/api/locations', locationsRoutes);
 
   // Health check
   app.get('/api/health', (_req, res) => {

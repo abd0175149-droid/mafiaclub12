@@ -32,7 +32,7 @@ router.post('/', requireAuth, requireAdmin, (req: AuthRequest, res) => {
   // Create default settings
   db.prepare('INSERT INTO user_settings (userId) VALUES (?)').run(result.lastInsertRowid);
 
-  logAudit(req.user!.id, 'create', 'staff', result.lastInsertRowid);
+  logAudit(req.user!.id, 'create', 'staff', result.lastInsertRowid.toString());
   const staff = db.prepare('SELECT id, username, displayName, role, createdAt FROM staff WHERE id = ?').get(result.lastInsertRowid);
   res.status(201).json(staff);
 });

@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { apiGet, apiPost, apiPut, apiDelete } from './lib/api';
 import { collection, query, onSnapshot, orderBy, Timestamp, addDoc, updateDoc, doc, deleteDoc, setDoc, where, writeBatch, getDocs, db, handleFirestoreError, OperationType, createNotification, notifyAllAdmins, updatePassword, updateProfile, auth as firebaseAuth } from './lib/firebase-compat';
-import { Activity, Booking, Cost, Notification, UserSettings, FoundationalCost, StaffMember } from './types';
+import { Activity, Booking, Cost, Notification, UserSettings, FoundationalCost, StaffMember, Location } from './types';
+import LocationsView from './views/LocationsView';
+import FinanceView from './views/FinanceView';
+import ActivityDetails from './views/ActivityDetails';
 import { useAuth } from './AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -30,7 +33,7 @@ import {
   Plus, Users, DollarSign, Calendar as CalendarIcon, TrendingUp, TrendingDown, 
   Trash2, Pencil, CheckCircle2, Clock, Bell, Settings as SettingsIcon,
   LayoutDashboard, AlertTriangle, Info, Check, PieChart as PieChartIcon,
-  Building2, User as UserIcon, LogOut, Shield, Key
+  Building2, User as UserIcon, LogOut, Shield, Key, Menu, X
 } from 'lucide-react';
 import { format, isAfter, startOfDay } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
@@ -59,6 +62,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function Dashboard() {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { profile, logout } = useAuth();
   const [activities, setActivities] = useState<Activity[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -67,22 +71,27 @@ export default function Dashboard() {
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [settings, setSettings] = useState<UserSettings | null>(null);
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [activeTab, setActiveTab] = useState('overview');
+  const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
   const [loading, setLoading] = useState(true);
 
   const isAdmin = profile?.role === 'admin';
 
   const fetchAll = useCallback(async () => {
     try {
-      const [act, book, cos, found, notif, sett] = await Promise.all([
+      const [act, book, cos, found, notif, sett, locs] = await Promise.all([
         apiGet<Activity[]>('/activities'),
         apiGet<Booking[]>('/bookings'),
         apiGet<Cost[]>('/costs'),
         apiGet<FoundationalCost[]>('/foundational'),
         apiGet<Notification[]>('/notifications'),
         apiGet<UserSettings>('/settings'),
+        apiGet<Location[]>('/locations').catch(() => []),
       ]);
       setActivities(act); setBookings(book); setCosts(cos);
       setFoundationalCosts(found); setNotifications(notif); setSettings(sett);
+      setLocations(locs || []);
       if (isAdmin) { const s = await apiGet<StaffMember[]>('/staff'); setStaff(s); }
     } catch (err) { console.error('Fetch error:', err); }
     setLoading(false);
@@ -157,332 +166,280 @@ export default function Dashboard() {
 
   if (loading) return <div className="flex items-center justify-center h-screen">Loading...</div>;
 
+  if (selectedActivity) {
+    return (
+      <ActivityDetails 
+        activity={selectedActivity}
+        location={locations.find(l => l.id == selectedActivity.locationId) || null}
+        bookings={bookings}
+        costs={costs}
+        onBack={() => setSelectedActivity(null)}
+      />
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-neutral-50 p-4 md:p-8" dir="rtl">
-      <div className="max-w-7xl mx-auto space-y-8">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="bg-neutral-900 p-2.5 rounded-xl shadow-lg">
-              <Shield className="w-8 h-8 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight text-neutral-900">نظام إدارة Mafia Club</h1>
-              <p className="text-neutral-500 text-sm">لوحة التحكم الإدارية للفريق</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <NotificationCenter notifications={notifications} />
-            
-            <DropdownMenu>
+    <div className="flex h-screen bg-neutral-50 overflow-hidden relative" dir="rtl">
+      {/* Mobile Overlay */}
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 md:hidden" 
+          onClick={() => setIsMobileMenuOpen(false)} 
+        />
+      )}
+
+      {/* Sidebar Navigation */}
+      <aside className={`bg-neutral-900 border-l border-neutral-800 text-white w-64 flex-shrink-0 flex flex-col transition-all duration-300 md:relative md:flex ${isMobileMenuOpen ? 'fixed inset-y-0 right-0 z-50 flex' : 'hidden'}`}>
+         <div className="p-6 flex items-center gap-3 border-b border-neutral-800">
+           <div className="bg-neutral-800 p-2.5 rounded-xl text-white shadow-lg">
+             <Shield className="w-6 h-6 text-emerald-400" />
+           </div>
+           <div>
+             <h1 className="text-lg font-bold tracking-tight leading-tight">Mafia Club</h1>
+             <p className="text-neutral-400 text-xs text-right">لوحة الإدارة</p>
+           </div>
+         </div>
+         
+         <nav className="flex-1 overflow-y-auto p-4 space-y-2">
+            {[
+              { id: 'overview', icon: LayoutDashboard, label: 'نظرة عامة' },
+              { id: 'activities', icon: CalendarIcon, label: 'الأنشطة المجدولة' },
+              { id: 'bookings', icon: Users, label: 'قاعدة الحجوزات' },
+              { id: 'finances', icon: DollarSign, label: 'المالية الشاملة' },
+              { id: 'locations', icon: PieChartIcon, label: 'أماكن الفعاليات' },
+            ].map(tc => (
+              <button 
+                key={tc.id} 
+                onClick={() => { setActiveTab(tc.id); setIsMobileMenuOpen(false); }} 
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === tc.id ? 'bg-neutral-800 text-white shadow-md border border-neutral-700/50' : 'text-neutral-400 hover:bg-neutral-800/50 hover:text-white'}`}
+              >
+                <tc.icon className="w-5 h-5 flex-shrink-0" />
+                <span className="font-bold text-sm">{tc.label}</span>
+              </button>
+            ))}
+            {isAdmin && (
+              <button 
+                onClick={() => { setActiveTab('users'); setIsMobileMenuOpen(false); }} 
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'users' ? 'bg-neutral-800 text-white shadow-md border border-neutral-700/50' : 'text-neutral-400 hover:bg-neutral-800/50 hover:text-white'}`}
+              >
+                <Shield className="w-5 h-5 flex-shrink-0 text-emerald-400" />
+                <span className="font-bold text-sm text-emerald-400">إدارة الإداريين</span>
+              </button>
+            )}
+         </nav>
+
+         <div className="p-4 border-t border-neutral-800 flex items-center justify-between">
+           <DropdownMenu>
               <DropdownMenuTrigger render={
-                <Button variant="ghost" className="flex items-center gap-2 p-1 pl-3 rounded-full hover:bg-neutral-100 border border-neutral-200">
-                  <div className="w-8 h-8 rounded-full bg-neutral-900 flex items-center justify-center overflow-hidden">
+                <Button variant="ghost" className="w-full flex items-center justify-start gap-3 p-3 rounded-xl hover:bg-neutral-800 border border-neutral-800 h-auto">
+                  <div className="w-8 h-8 rounded-full bg-neutral-700 flex items-center justify-center overflow-hidden shrink-0">
                     {profile?.photoURL ? <img src={profile.photoURL} alt="" className="w-full h-full object-cover" /> : <UserIcon className="w-4 h-4 text-white" />}
                   </div>
-                  <div className="text-right hidden sm:block">
-                    <p className="text-xs font-bold leading-none">{profile?.displayName || 'مستخدم'}</p>
-                    <p className="text-[10px] text-neutral-500">{profile?.role === 'admin' ? 'مسؤول' : 'مدير'}</p>
+                  <div className="text-right flex-1 overflow-hidden">
+                    <p className="text-xs font-bold leading-none truncate text-right text-white">{profile?.displayName || 'مستخدم'}</p>
+                    <p className="text-[10px] text-neutral-400 truncate text-right mt-1">{profile?.role === 'admin' ? 'مسؤول' : 'مدير'}</p>
                   </div>
                 </Button>
               } />
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuGroup>
-                  <DropdownMenuLabel>حسابي</DropdownMenuLabel>
-                </DropdownMenuGroup>
+              <DropdownMenuContent align="end" className="w-56 mb-2">
+                <DropdownMenuItem className="cursor-pointer" onClick={() => { setActiveTab('profile'); setIsMobileMenuOpen(false); }}>
+                  <SettingsIcon className="w-4 h-4 ml-2" /> إعدادات الحساب
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="cursor-pointer" onClick={() => logout()}>
-                  <LogOut className="w-4 h-4 ml-2" />
-                  تسجيل الخروج
+                <DropdownMenuItem className="cursor-pointer text-rose-600 focus:bg-rose-50" onClick={() => logout()}>
+                  <LogOut className="w-4 h-4 ml-2" /> تسجيل الخروج
                 </DropdownMenuItem>
               </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
+           </DropdownMenu>
+           <NotificationCenter notifications={notifications} />
+         </div>
+      </aside>
 
-        <Tabs defaultValue="overview" className="w-full" dir="rtl">
-          <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-7' : 'grid-cols-6'} mb-8 bg-white p-1 rounded-xl shadow-sm border border-neutral-200`}>
-            <TabsTrigger value="overview" className="rounded-lg data-[state=active]:bg-neutral-900 data-[state=active]:text-white">نظرة عامة</TabsTrigger>
-            <TabsTrigger value="activities" className="rounded-lg data-[state=active]:bg-neutral-900 data-[state=active]:text-white">الأنشطة</TabsTrigger>
-            <TabsTrigger value="bookings" className="rounded-lg data-[state=active]:bg-neutral-900 data-[state=active]:text-white">الحجوزات</TabsTrigger>
-            <TabsTrigger value="finances" className="rounded-lg data-[state=active]:bg-neutral-900 data-[state=active]:text-white">المالية</TabsTrigger>
-            <TabsTrigger value="foundational" className="rounded-lg data-[state=active]:bg-neutral-900 data-[state=active]:text-white">التأسيس</TabsTrigger>
-            <TabsTrigger value="profile" className="rounded-lg data-[state=active]:bg-neutral-900 data-[state=active]:text-white">حسابي</TabsTrigger>
-          {isAdmin && <TabsTrigger value="users" className="rounded-lg data-[state=active]:bg-neutral-900 data-[state=active]:text-white">إدارة الموظفين</TabsTrigger>}
-          </TabsList>
+      {/* Main Content Area */}
+      <main className="flex-1 overflow-y-auto w-full min-w-0">
+         {/* Mobile Header */}
+         <div className="md:hidden bg-white border-b border-neutral-200 p-4 flex items-center justify-between sticky top-0 z-30 shadow-sm">
+           <div className="flex items-center gap-2">
+             <Shield className="w-6 h-6 text-emerald-500" />
+             <span className="font-bold text-lg text-neutral-900">Mafia Club</span>
+           </div>
+           <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(true)}>
+             <Menu className="w-6 h-6 text-neutral-900" />
+           </Button>
+         </div>
 
-          <TabsContent value="overview" className="space-y-8">
-            {/* KPI Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {settings?.dashboardLayout.includes('revenue') && (
-                <KPICard title="إجمالي الإيرادات" value={`${totalRevenue.toLocaleString()} د.أ`} icon={<TrendingUp className="text-emerald-500" />} subtitle={`من ${bookings.length} حجز`} />
-              )}
-              {settings?.dashboardLayout.includes('costs') && (
-                <KPICard title="إجمالي التكاليف" value={`${totalCosts.toLocaleString()} د.أ`} icon={<TrendingDown className="text-rose-500" />} subtitle="تكاليف عامة وأنشطة" />
-              )}
-              {settings?.dashboardLayout.includes('profit') && (
-                <KPICard title="صافي الربح" value={`${netProfit.toLocaleString()} د.أ`} icon={<DollarSign className="text-blue-500" />} subtitle="بعد خصم المصاريف" trend={netProfit >= 0 ? 'up' : 'down'} />
-              )}
-              {settings?.dashboardLayout.includes('bookings') && (
-                <KPICard title="الحجوزات النشطة" value={activeBookingsCount.toString()} icon={<Users className="text-amber-500" />} subtitle="للأنشطة القادمة" />
-              )}
-            </div>
+         <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
+            
+            <div className={activeTab === 'overview' ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
+              <h2 className="text-2xl font-bold mb-6">نظرة عامة والتحليلات</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {settings?.dashboardLayout.includes('revenue') && (
+                  <KPICard title="إجمالي الإيرادات" value={`${totalRevenue.toLocaleString()} د.أ`} icon={<TrendingUp className="text-emerald-500" />} subtitle={`من ${bookings.length} حجز`} />
+                )}
+                {settings?.dashboardLayout.includes('costs') && (
+                  <KPICard title="إجمالي التكاليف" value={`${totalCosts.toLocaleString()} د.أ`} icon={<TrendingDown className="text-rose-500" />} subtitle="تكاليف عامة وأنشطة" />
+                )}
+                {settings?.dashboardLayout.includes('profit') && (
+                  <KPICard title="صافي الربح" value={`${netProfit.toLocaleString()} د.أ`} icon={<DollarSign className="text-blue-500" />} subtitle="بعد خصم المصاريف" trend={netProfit >= 0 ? 'up' : 'down'} />
+                )}
+                {settings?.dashboardLayout.includes('bookings') && (
+                  <KPICard title="الحجوزات النشطة" value={activeBookingsCount.toString()} icon={<Users className="text-amber-500" />} subtitle="للأنشطة القادمة" />
+                )}
+              </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* Upcoming Activities */}
-              <Card className="lg:col-span-2 border-none shadow-sm">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <CalendarIcon className="w-5 h-5" /> الأنشطة القادمة
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {upcomingActivities.length > 0 ? upcomingActivities.map(activity => {
-                      const stats = getActivityStats(activity.id);
-                      return (
-                        <div key={activity.id} className="flex items-center justify-between p-4 bg-white border border-neutral-100 rounded-xl hover:border-neutral-300 transition-all">
-                          <div className="flex items-center gap-4">
-                            <div className="bg-neutral-900 text-white p-3 rounded-lg text-center min-w-[60px]">
-                              <div className="text-xs uppercase">{format(safeDate(activity.date)!, 'MMM')}</div>
-                              <div className="text-xl font-bold">{format(safeDate(activity.date)!, 'dd')}</div>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
+                {/* Upcoming Activities */}
+                <Card className="lg:col-span-2 border-none shadow-sm">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <CalendarIcon className="w-5 h-5" /> الأنشطة القادمة
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {upcomingActivities.length > 0 ? upcomingActivities.map(activity => {
+                        const stats = getActivityStats(activity.id);
+                        return (
+                          <div key={activity.id} className="flex items-center justify-between p-4 bg-white border border-neutral-100 rounded-xl hover:border-neutral-300 transition-all">
+                            <div className="flex items-center gap-4">
+                              <div className="bg-neutral-900 text-white p-3 rounded-lg text-center min-w-[60px]">
+                                <div className="text-xs uppercase">{format(safeDate(activity.date)!, 'MMM')}</div>
+                                <div className="text-xl font-bold">{format(safeDate(activity.date)!, 'dd')}</div>
+                              </div>
+                              <div>
+                                <h4 className="font-bold text-neutral-900">{activity.name}</h4>
+                                <p className="text-sm text-neutral-500">{format(safeDate(activity.date)!, 'hh:mm a')}</p>
+                              </div>
                             </div>
-                            <div>
-                              <h4 className="font-bold text-neutral-900">{activity.name}</h4>
-                              <p className="text-sm text-neutral-500">{format(safeDate(activity.date)!, 'hh:mm a')}</p>
+                            <div className="flex items-center gap-6">
+                              <div className="text-right">
+                                <p className="text-xs text-neutral-500">الحضور</p>
+                                <p className="font-bold">{stats.attendees}</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-xs text-neutral-500">الحالة</p>
+                                <Badge variant="outline" className={STATUS_COLORS[activity.status]}>{STATUS_LABELS[activity.status]}</Badge>
+                              </div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-6">
-                            <div className="text-right">
-                              <p className="text-xs text-neutral-500">الحضور</p>
-                              <p className="font-bold">{stats.attendees}</p>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-xs text-neutral-500">الحالة</p>
-                              <Badge variant="outline" className={STATUS_COLORS[activity.status]}>{STATUS_LABELS[activity.status]}</Badge>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    }) : (
-                      <div className="text-center py-8 text-neutral-400">لا توجد أنشطة قادمة حالياً</div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+                        );
+                      }) : (
+                        <div className="text-center py-8 text-neutral-400">لا توجد أنشطة قادمة حالياً</div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
 
-              {/* Booking Status Pie Chart (Simplified with Bars) */}
-              <Card className="border-none shadow-sm">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <PieChartIcon className="w-5 h-5" /> حالة الحجوزات
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={[
-                      { name: 'مدفوع', count: bookings.filter(b => b.isPaid && !b.isFree).length, color: '#10b981' },
-                      { name: 'مجاني', count: bookings.filter(b => b.isFree).length, color: '#3b82f6' },
-                      { name: 'غير مدفوع', count: bookings.filter(b => !b.isPaid && !b.isFree).length, color: '#f59e0b' }
-                    ]}>
-                      <XAxis dataKey="name" />
-                      <YAxis />
-                      <Tooltip />
-                      <Bar dataKey="count">
-                        {[0, 1, 2].map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={['#10b981', '#3b82f6', '#f59e0b'][index]} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="activities">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-2xl font-bold">الأنشطة</h2>
-                <p className="text-neutral-500">إدارة جلسات الألعاب والفعاليات</p>
+                {/* Booking Status Chart */}
+                <Card className="border-none shadow-sm">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <PieChartIcon className="w-5 h-5" /> حالة الحجوزات
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="h-[300px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={[
+                        { name: 'مدفوع', count: bookings.filter(b => b.isPaid && !b.isFree).length, color: '#10b981' },
+                        { name: 'مجاني', count: bookings.filter(b => b.isFree).length, color: '#3b82f6' },
+                        { name: 'غير مدفوع', count: bookings.filter(b => !b.isPaid && !b.isFree).length, color: '#f59e0b' }
+                      ]}>
+                        <XAxis dataKey="name" />
+                        <YAxis />
+                        <Tooltip />
+                        <Bar dataKey="count">
+                          {[0, 1, 2].map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={['#10b981', '#3b82f6', '#f59e0b'][index]} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
               </div>
-              <ActivityForm />
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {activities.length > 0 ? activities.map(activity => (
-                <ActivityCard key={activity.id} activity={activity} stats={getActivityStats(activity.id)} onDelete={() => handleDeleteActivity(activity)} />
-              )) : (
-                <div className="col-span-full text-center py-16 text-neutral-400">
-                  <CalendarIcon className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                  <p className="text-lg font-medium">لا توجد أنشطة حالياً</p>
-                  <p className="text-sm">ابدأ بإضافة نشاط جديد</p>
-                </div>
-              )}
-            </div>
-          </TabsContent>
 
-          <TabsContent value="bookings">
-            <BookingsTabContent bookings={bookings} activities={activities} />
-          </TabsContent>
-
-          <TabsContent value="finances">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <Card className="border-none shadow-sm">
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <div>
-                    <CardTitle>التكاليف والمصاريف</CardTitle>
-                    <CardDescription>سجل المصاريف العامة والخاصة</CardDescription>
-                  </div>
-                  <CostForm activities={activities} bookings={bookings} costs={costs} />
-                </CardHeader>
-                <CardContent>
-                  <Table dir="rtl">
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>البند</TableHead>
-                        <TableHead>النوع</TableHead>
-                        <TableHead>المبلغ</TableHead>
-                        <TableHead>التاريخ</TableHead>
-                        <TableHead>الشخص</TableHead>
-                        <TableHead>إجراءات</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {costs.map(cost => (
-                        <TableRow key={cost.id}>
-                          <TableCell className="font-medium">{cost.item}</TableCell>
-                          <TableCell>
-                            {cost.type === 'general' ? (
-                              <Badge variant="outline">عامة</Badge>
-                            ) : (
-                              <Badge variant="outline" className="text-blue-600 border-blue-200">نشاط: {activities.find(a => a.id === cost.activityId)?.name}</Badge>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-rose-600 font-bold">{cost.amount} {CURRENCY}</TableCell>
-                          <TableCell>{format(safeDate(cost.date)!, 'yyyy/MM/dd')}</TableCell>
-                          <TableCell>{cost.paidBy}</TableCell>
-                          <TableCell>
-                            <Button variant="ghost" size="icon" className="text-rose-500" onClick={() => { if (window.confirm('هل تريد حذف هذا المصروف؟')) deleteDoc(doc(db, 'costs', cost.id)); }}>
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-
-              <Card className="border-none shadow-sm">
-                <CardHeader>
-                  <CardTitle>توزيع الأرباح</CardTitle>
-                  <CardDescription>مقارنة الأداء المالي لآخر 5 أنشطة</CardDescription>
-                </CardHeader>
-                <CardContent className="h-[400px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <XAxis dataKey="name" />
-                      <YAxis />
-                      <Tooltip />
-                      <Bar dataKey="profit" name="الربح">
-                        {chartData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.profit >= 0 ? '#10b981' : '#f43f5e'} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="foundational">
-            <FoundationalCostsTab costs={foundationalCosts} />
-          </TabsContent>
-
-          <TabsContent value="profile">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="lg:col-span-2">
-                <ProfileTab />
-              </div>
+            <div className={activeTab === 'activities' ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
               <div className="space-y-6">
-                <Card className="border-none shadow-sm">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <Bell className="w-5 h-5" /> إعدادات الإشعارات
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label>حجوزات جديدة</Label>
-                        <p className="text-[10px] text-neutral-500">تلقي تنبيه عند تسجيل أي حجز جديد</p>
-                      </div>
-                      <Switch 
-                        checked={settings?.notifications.newBooking} 
-                        onCheckedChange={(v) => updateNotificationSetting('newBooking', v)} 
-                      />
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="text-2xl font-bold">الأنشطة المجدولة</h2>
+                    <p className="text-neutral-500">إدارة الجلسات والفعاليات</p>
+                  </div>
+                  <ActivityForm locations={locations} fetchAll={fetchAll} />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {activities.length > 0 ? activities.map(activity => (
+                    <div className="cursor-pointer" key={activity.id}>
+                      <ActivityCard activity={activity} stats={getActivityStats(activity.id)} onDelete={() => handleDeleteActivity(activity)} onSelect={() => setSelectedActivity(activity)} />
                     </div>
-                    <Separator />
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label>اقتراب موعد النشاط</Label>
-                        <p className="text-[10px] text-neutral-500">تنبيه قبل 24 ساعة من موعد النشاط</p>
-                      </div>
-                      <Switch 
-                        checked={settings?.notifications.upcomingActivity} 
-                        onCheckedChange={(v) => updateNotificationSetting('upcomingActivity', v)} 
-                      />
+                  )) : (
+                    <div className="col-span-full text-center py-16 text-neutral-400">
+                      <CalendarIcon className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                      <p className="text-lg font-medium">لا توجد أنشطة حالياً</p>
+                      <p className="text-sm">ابدأ بإضافة نشاط جديد</p>
                     </div>
-                    <Separator />
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label>تنبيهات التكاليف</Label>
-                        <p className="text-[10px] text-neutral-500">تنبيه عند تجاوز التكاليف للإيرادات</p>
-                      </div>
-                      <Switch 
-                        checked={settings?.notifications.costAlert} 
-                        onCheckedChange={(v) => updateNotificationSetting('costAlert', v)} 
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="border-none shadow-sm">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <LayoutDashboard className="w-5 h-5" /> تخصيص اللوحة
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {[
-                      { id: 'revenue', label: 'إجمالي الإيرادات' },
-                      { id: 'costs', label: 'إجمالي التكاليف' },
-                      { id: 'profit', label: 'صافي الربح' },
-                      { id: 'bookings', label: 'الحجوزات النشطة' }
-                    ].map(item => (
-                      <div key={item.id} className="flex items-center justify-between p-2.5 bg-neutral-50 rounded-lg">
-                        <Label className="text-xs cursor-pointer" onClick={() => toggleLayoutItem(item.id)}>{item.label}</Label>
-                        <Switch 
-                          checked={settings?.dashboardLayout.includes(item.id)} 
-                          onCheckedChange={() => toggleLayoutItem(item.id)} 
-                        />
-                      </div>
-                    ))}
-                  </CardContent>
-                </Card>
+                  )}
+                </div>
               </div>
             </div>
-          </TabsContent>
 
-          {isAdmin && (
-            <TabsContent value="users">
-              <UserManagementTab users={staff} />
-            </TabsContent>
-          )}
-        </Tabs>
-      </div>
+            <div className={activeTab === 'bookings' ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
+              <BookingsTabContent bookings={bookings} activities={activities} />
+            </div>
+
+            <div className={activeTab === 'finances' ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
+              <FinanceView activities={activities} bookings={bookings} costs={costs} foundationalCosts={foundationalCosts} fetchData={fetchAll} />
+            </div>
+
+            <div className={activeTab === 'locations' ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
+              <LocationsView />
+            </div>
+
+            <div className={activeTab === 'profile' ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-2">
+                  <ProfileTab />
+                </div>
+                <div>
+                  <Card className="border-none shadow-sm h-full">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <SettingsIcon className="w-5 h-5 text-neutral-500" /> لوحة التحكم
+                      </CardTitle>
+                      <CardDescription>إعدادات واجهة المستخدم وتفضيلات العرض</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      <div className="space-y-4">
+                        <h4 className="font-medium text-sm text-neutral-900 border-b pb-2">عناصر النظرة العامة</h4>
+                        {settings && [
+                          { id: 'revenue', label: 'إجمالي الإيرادات' },
+                          { id: 'costs', label: 'إجمالي التكاليف' },
+                          { id: 'profit', label: 'صافي الربح' },
+                          { id: 'bookings', label: 'الحجوزات النشطة' },
+                        ].map(item => (
+                          <div key={item.id} className="flex items-center justify-between">
+                            <Label className="cursor-pointer">{item.label}</Label>
+                            <Switch 
+                              checked={settings.dashboardLayout.includes(item.id)}
+                              onCheckedChange={() => toggleLayoutItem(item.id)} 
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            </div>
+
+            {isAdmin && (
+              <div className={activeTab === 'users' ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
+                <UserManagementTab users={staff} />
+              </div>
+            )}
+         </div>
+      </main>
       <Toaster position="top-center" />
     </div>
   );
@@ -511,14 +468,14 @@ function KPICard({ title, value, icon, subtitle, trend }: { title: string, value
 function NotificationCenter({ notifications }: { notifications: Notification[] }) {
   const unreadCount = notifications.filter(n => !n.read).length;
 
-  const markAsRead = async (id: string) => {
-    await updateDoc(doc(db, 'notifications', id), { read: true });
+  const markAsRead = async (id: string | number) => {
+    await updateDoc(doc(db, 'notifications', id.toString()), { read: true });
   };
 
   const markAllAsRead = async () => {
     const batch = writeBatch(db);
     notifications.filter(n => !n.read).forEach(n => {
-      batch.update(doc(db, 'notifications', n.id), { read: true });
+      batch.update(doc(db, 'notifications', n.id.toString()), { read: true });
     });
     await batch.commit();
   };
@@ -837,31 +794,31 @@ function BookingsTabContent({ bookings, activities }: { bookings: Booking[], act
 }
 
 // Forms
-function ActivityForm() {
-  const { user } = useAuth();
+function ActivityForm({ locations, fetchAll }: { locations: Location[], fetchAll: () => void }) {
+  const { profile } = useAuth();
   const [open, setOpen] = useState(false);
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     try {
       const name = formData.get('name') as string;
-      await addDoc(collection(db, 'activities'), {
+      const locationId = formData.get('locationId') as string;
+      
+      await apiPost('/activities', {
         name,
-        date: Timestamp.fromDate(new Date(formData.get('date') as string)),
+        date: new Date(formData.get('date') as string).toISOString(),
         description: formData.get('description'),
         basePrice: Number(formData.get('basePrice')),
         status: 'planned',
-        createdAt: Timestamp.now()
+        locationId: locationId && locationId !== 'none' ? Number(locationId) : null,
+        driveLink: formData.get('driveLink')
       });
-      
-      if (user) {
-        await notifyAllAdmins('نشاط جديد', `تمت إضافة نشاط جديد: ${name}`, 'upcoming_activity', user.uid);
-      }
 
       setOpen(false);
       toast.success('تم إضافة النشاط بنجاح');
-    } catch (err) {
-      handleFirestoreError(err, OperationType.CREATE, 'activities');
+      fetchAll();
+    } catch (err: any) {
+      toast.error(err.message || 'حدث خطأ عند الحفظ');
     }
   };
 
@@ -894,6 +851,21 @@ function ActivityForm() {
           <div className="space-y-2">
             <Label>الوصف</Label>
             <Input name="description" placeholder="تفاصيل النشاط..." />
+          </div>
+          <div className="space-y-2">
+            <Label>موقع الفعالية</Label>
+            <Select name="locationId" defaultValue="none">
+              <SelectTrigger><SelectValue placeholder="اختر المكان..." /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">غير محدد</SelectItem>
+                {locations.map(loc => <SelectItem key={loc.id} value={loc.id.toString()}>{loc.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>رابط التعاون Google Drive (اختياري)</Label>
+            <Input name="driveLink" placeholder="يجب أن يكون Anyone with the link" dir="ltr" />
+            <p className="text-[10px] text-orange-500">ملاحظة: تأكد أن مجلد درايف مفتوح الصلاحية "Anyone with the link".</p>
           </div>
           <DialogFooter>
             <Button type="submit" className="w-full">حفظ النشاط</Button>

@@ -19,7 +19,7 @@ router.post('/', requireAuth, requireAdmin, (req: AuthRequest, res) => {
     'INSERT INTO foundational_costs (item, amount, paidBy, source, date) VALUES (?,?,?,?,?)'
   ).run(item, amount, paidBy || '', source || '', date);
 
-  logAudit(req.user!.id, 'create', 'foundational_costs', result.lastInsertRowid);
+  logAudit(req.user!.id, 'create', 'foundational_costs', result.lastInsertRowid.toString());
   const cost = db.prepare('SELECT * FROM foundational_costs WHERE id = ?').get(result.lastInsertRowid);
   res.status(201).json(cost);
 });
