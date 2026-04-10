@@ -157,12 +157,18 @@ export default function Dashboard() {
   };
 
   const handleDeleteActivity = async (activity: Activity) => {
-    if (!window.confirm(`هل تريد حذف "${activity.name}"?\nسيتم حذف جميع الحجوزات والتكاليف المرتبطة.`)) return;
+    console.log('[DELETE] handleDeleteActivity called for:', activity.id, activity.name);
+    const confirmed = window.confirm(`هل تريد حذف "${activity.name}"?\nسيتم حذف جميع الحجوزات والتكاليف المرتبطة.`);
+    console.log('[DELETE] User confirmed:', confirmed);
+    if (!confirmed) return;
     try {
-      await apiDelete(`/activities/${activity.id}`);
+      console.log('[DELETE] Calling API: DELETE /activities/' + activity.id);
+      const result = await apiDelete(`/activities/${activity.id}`);
+      console.log('[DELETE] API response:', result);
       toast.success('تم حذف النشاط وبياناته المرتبطة');
       fetchAll();
     } catch (err: any) {
+      console.error('[DELETE] API error:', err);
       toast.error(err.message || 'حدث خطأ أثناء الحذف');
     }
   };
@@ -556,6 +562,8 @@ interface ActivityCardProps {
     paidAttendees: number;
   };
   onDelete?: () => void;
+  onStatusChange?: () => void;
+  onSelect?: () => void;
 }
 
 const ActivityCard: React.FC<ActivityCardProps> = ({ activity, stats, onDelete, onStatusChange, onSelect }) => {
@@ -588,8 +596,8 @@ const ActivityCard: React.FC<ActivityCardProps> = ({ activity, stats, onDelete, 
           <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {stats.freeAttendees} مجاني</span>
           <span className="flex items-center gap-1"><DollarSign className="w-3 h-3" /> {activity.basePrice} {CURRENCY} / شخص</span>
         </div>
-        {/* Status change + Delete [BL-04, F-01, F-02, F-10] */}
-        <div className="flex items-center gap-2 pt-2 border-t border-neutral-100" onClick={(e) => e.stopPropagation()}>
+        {/* Status + View + Delete */}
+        <div className="flex items-center gap-2 pt-2 border-t border-neutral-100">
           <Select
             value={activity.status}
             onValueChange={async (v) => { try { await apiPut('/activities/' + activity.id, { status: v }); if (onStatusChange) onStatusChange(); } catch (e) { console.error(e); } }}
@@ -604,11 +612,12 @@ const ActivityCard: React.FC<ActivityCardProps> = ({ activity, stats, onDelete, 
               <SelectItem value="cancelled">ملغي</SelectItem>
             </SelectContent>
           </Select>
-          {onDelete && (
-            <button type="button" className="inline-flex items-center justify-center text-rose-500 h-8 w-8 rounded-md hover:bg-rose-50 transition-colors" onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (onDelete) onDelete(); }}>
-              <Trash2 className="w-4 h-4" />
-            </button>
-          )}
+          <button type="button" title="عرض التفاصيل" className="inline-flex items-center justify-center text-blue-600 h-8 w-8 rounded-md hover:bg-blue-50 transition-colors" onClick={() => { console.log('[CARD] View details:', activity.id); if (onSelect) onSelect(); }}>
+            <Info className="w-4 h-4" />
+          </button>
+          <button type="button" title="حذف" className="inline-flex items-center justify-center text-rose-500 h-8 w-8 rounded-md hover:bg-rose-50 transition-colors" onClick={() => { console.log('[CARD] Delete clicked:', activity.id); if (onDelete) onDelete(); }}>
+            <Trash2 className="w-4 h-4" />
+          </button>
         </div>
       </CardContent>
     </Card>
