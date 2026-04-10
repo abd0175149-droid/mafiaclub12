@@ -31,14 +31,25 @@ export default function ActivityDetails({ activity, location, bookings, costs, o
 
   const totalAttendees = activityBookings.reduce((sum, b) => sum + b.count, 0);
 
-  // Extract Drive Embed URL implicitly if user pasted full google drive link
+  // Convert Google Drive links to embeddable URLs
   const getEmbedUrl = (link?: string) => {
     if (!link) return null;
-    // Example: https://drive.google.com/drive/folders/123456789abc
-    if (link.includes('drive.google.com')) {
-      // It's usually better to just use the raw link, but iframe has restrictions if not specifically embedded or public
-      return link;
+    // Handle folder links: https://drive.google.com/drive/folders/FOLDER_ID
+    const folderMatch = link.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+    if (folderMatch) {
+      return 'https://drive.google.com/embeddedfolderview?id=' + folderMatch[1] + '#grid';
     }
+    // Handle file links: https://drive.google.com/file/d/FILE_ID/view
+    const fileMatch = link.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+    if (fileMatch) {
+      return 'https://drive.google.com/file/d/' + fileMatch[1] + '/preview';
+    }
+    // Handle docs/sheets/slides
+    const docsMatch = link.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if (docsMatch && link.includes('docs.google.com')) {
+      return link.replace(/\/edit.*$/, '/preview');
+    }
+    // Fallback: if it's a drive link, return as-is
     return link;
   };
 

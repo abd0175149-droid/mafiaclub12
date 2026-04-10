@@ -37,6 +37,7 @@ export default function UserManagementTab({ users, fetchAll }: { users: StaffMem
   const [editName, setEditName] = useState('');
   const [editRole, setEditRole] = useState<'admin' | 'manager'>('manager');
   const [editPerms, setEditPerms] = useState<string[]>([]);
+  const [editPassword, setEditPassword] = useState('');
   
   // Create state
   const [createPerms, setCreatePerms] = useState<string[]>(['activities', 'bookings', 'locations', 'finances']);
@@ -89,6 +90,7 @@ export default function UserManagementTab({ users, fetchAll }: { users: StaffMem
     } catch {
       setEditPerms([]);
     }
+    setEditPassword('');
     setEditOpen(true);
   };
 
@@ -100,6 +102,10 @@ export default function UserManagementTab({ users, fetchAll }: { users: StaffMem
         role: editRole,
         permissions: editPerms
       });
+      // If password was provided, change it too
+      if (editPassword && editPassword.length >= 4) {
+        await apiPut(`/staff/${editingUser.id}/password`, { password: editPassword });
+      }
       toast.success('تم تحديث معلومات الموظف بنجاح');
       setEditOpen(false);
       fetchAll();
@@ -217,9 +223,6 @@ export default function UserManagementTab({ users, fetchAll }: { users: StaffMem
                   <TableCell>{u.createdAt ? format(safeDate(u.createdAt)!, 'yyyy/MM/dd') : '-'}</TableCell>
                   <TableCell className="text-left">
                     <div className="flex items-center gap-1 justify-end">
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-neutral-600 hover:text-blue-600" onClick={() => handlePasswordChange(u.id)}>
-                        <Key className="w-4 h-4" />
-                      </Button>
                       <Button variant="ghost" size="icon" className="h-8 w-8 text-neutral-600 hover:text-emerald-600" onClick={() => openEditModal(u)}>
                         <Settings className="w-4 h-4" />
                       </Button>
@@ -259,6 +262,17 @@ export default function UserManagementTab({ users, fetchAll }: { users: StaffMem
                        <SelectItem value="admin">مسؤول (Admin)</SelectItem>
                      </SelectContent>
                    </Select>
+                 </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                 <div className="space-y-2">
+                   <Label>اسم المستخدم</Label>
+                   <Input value={editingUser.username} readOnly disabled className="bg-neutral-100 text-neutral-500" dir="ltr" />
+                 </div>
+                 <div className="space-y-2">
+                   <Label>كلمة مرور جديدة (اختياري)</Label>
+                   <Input value={editPassword} onChange={e => setEditPassword(e.target.value)} placeholder="اترك فارغاً للإبقاء على القديمة" type="text" dir="ltr" className="text-left" />
                  </div>
               </div>
               

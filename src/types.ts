@@ -2,7 +2,7 @@ export interface Location {
   id: string | number;
   name: string;
   mapUrl?: string;
-  offers: string[];
+  offers: ({ description: string; price: number } | string)[];
   createdAt?: string;
 }
 

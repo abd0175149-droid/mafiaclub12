@@ -16,8 +16,9 @@ export default function LocationsView() {
 
   const [name, setName] = useState('');
   const [mapUrl, setMapUrl] = useState('');
-  const [offers, setOffers] = useState<string[]>([]);
-  const [newOffer, setNewOffer] = useState('');
+  const [offers, setOffers] = useState<{description: string, price: number}[]>([]);
+  const [newOfferDesc, setNewOfferDesc] = useState('');
+  const [newOfferPrice, setNewOfferPrice] = useState('');
 
   const fetchLocations = async () => {
     try {
@@ -34,9 +35,10 @@ export default function LocationsView() {
 
   const handleAddOffer = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newOffer.trim()) return;
-    setOffers([...offers, newOffer.trim()]);
-    setNewOffer('');
+    if (!newOfferDesc.trim()) return;
+    setOffers([...offers, { description: newOfferDesc.trim(), price: parseFloat(newOfferPrice) || 0 }]);
+    setNewOfferDesc('');
+    setNewOfferPrice('');
   };
 
   const handleRemoveOffer = (index: number) => {
@@ -48,7 +50,8 @@ export default function LocationsView() {
     setName('');
     setMapUrl('');
     setOffers([]);
-    setNewOffer('');
+    setNewOfferDesc('');
+    setNewOfferPrice('');
     setIsDialogOpen(true);
   };
 
@@ -56,8 +59,14 @@ export default function LocationsView() {
     setEditingLoc(loc);
     setName(loc.name);
     setMapUrl(loc.mapUrl || '');
-    setOffers(loc.offers || []);
-    setNewOffer('');
+    // Backward compat: if old format (string[]), convert to new format
+    const parsedOffers = (loc.offers || []).map((o: any) => {
+      if (typeof o === 'string') return { description: o, price: 0 };
+      return o;
+    });
+    setOffers(parsedOffers);
+    setNewOfferDesc('');
+    setNewOfferPrice('');
     setIsDialogOpen(true);
   };
 
@@ -124,15 +133,17 @@ export default function LocationsView() {
                 <Label className="flex items-center gap-2 border-t pt-4"><Gift className="w-4 h-4" /> عروض المكان (اختياري)</Label>
                 
                 <form onSubmit={handleAddOffer} className="flex gap-2">
-                  <Input value={newOffer} onChange={e => setNewOffer(e.target.value)} placeholder="اكتب تفاصيل العرض واضغط إضافة..." />
+                  <Input value={newOfferDesc} onChange={e => setNewOfferDesc(e.target.value)} placeholder="تفاصيل العرض..." className="flex-1" />
+                  <Input value={newOfferPrice} onChange={e => setNewOfferPrice(e.target.value)} placeholder="السعر" type="number" step="0.01" className="w-24" dir="ltr" />
                   <Button type="submit" variant="secondary" className="whitespace-nowrap">إضافة</Button>
                 </form>
 
                 {offers.length > 0 && (
                   <ul className="space-y-2 mt-4 bg-neutral-50 p-4 rounded-lg border border-neutral-100">
                     {offers.map((off, idx) => (
-                      <li key={idx} className="flex justify-between items-start gap-4 text-sm bg-white p-3 rounded shadow-sm border border-neutral-100">
-                        <span className="leading-relaxed">{off}</span>
+                      <li key={idx} className="flex justify-between items-center gap-4 text-sm bg-white p-3 rounded shadow-sm border border-neutral-100">
+                        <span className="leading-relaxed flex-1">{typeof off === 'string' ? off : off.description}</span>
+                        <span className="font-bold text-emerald-700 whitespace-nowrap">{typeof off === 'string' ? '' : off.price + ' د.أ'}</span>
                         <button type="button" onClick={() => handleRemoveOffer(idx)} className="text-rose-500 hover:text-rose-700 flex-shrink-0">
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -178,8 +189,11 @@ export default function LocationsView() {
                 <p className="text-xs font-bold text-neutral-500 uppercase flex items-center gap-1"><Gift className="w-3 h-3" /> العروض المتوفرة ({loc.offers?.length || 0})</p>
                 {loc.offers && loc.offers.length > 0 ? (
                   <ul className="text-sm space-y-1.5 list-disc list-inside text-neutral-700">
-                    {loc.offers.map((o, i) => (
-                      <li key={i} className="line-clamp-2" title={o}>{o}</li>
+                    {loc.offers.map((o: any, i: number) => (
+                      <li key={i} className="line-clamp-2 flex justify-between items-center gap-2">
+                        <span>{typeof o === 'string' ? o : o.description}</span>
+                        {typeof o !== 'string' && o.price > 0 && <span className="text-emerald-600 font-bold whitespace-nowrap text-xs">{o.price} د.أ</span>}
+                      </li>
                     ))}
                   </ul>
                 ) : (

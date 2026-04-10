@@ -592,10 +592,10 @@ const ActivityCard: React.FC<ActivityCardProps> = ({ activity, stats, onDelete }
           <span className="flex items-center gap-1"><DollarSign className="w-3 h-3" /> {activity.basePrice} {CURRENCY} / شخص</span>
         </div>
         {/* Status change + Delete [BL-04, F-01, F-02, F-10] */}
-        <div className="flex items-center gap-2 pt-2 border-t border-neutral-100">
+        <div className="flex items-center gap-2 pt-2 border-t border-neutral-100" onClick={(e) => e.stopPropagation()}>
           <Select
             value={activity.status}
-            onValueChange={async (v) => { try { await fetch('/api/activities/' + activity.id, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('token') }, body: JSON.stringify({ status: v }) }); if(typeof window !== 'undefined') window.location.reload(); } catch(e){} }}
+            onValueChange={async (v) => { try { await apiPut('/activities/' + activity.id, { status: v }); window.location.reload(); } catch(e) { console.error(e); } }}
           >
             <SelectTrigger className="h-8 text-xs flex-1">
               <SelectValue />
@@ -699,7 +699,7 @@ function BookingsTabContent({ bookings, activities }: { bookings: Booking[], act
           </Select>
         </div>
 
-        <Table dir="rtl">
+        <Table>
           <TableHeader>
             <TableRow>
               <TableHead>الاسم</TableHead>
@@ -744,7 +744,7 @@ function BookingsTabContent({ bookings, activities }: { bookings: Booking[], act
                         }
                       }}>دفع</Button>
                     )}
-                    <Button size="icon" variant="ghost" className="text-rose-500 h-8 w-8" onClick={() => { if (window.confirm('هل تريد حذف هذا الحجز؟')) deleteDoc(doc(db, 'bookings', booking.id)); }}>
+                    <Button size="icon" variant="ghost" className="text-rose-500 h-8 w-8" onClick={() => { if (window.confirm('هل تريد حذف هذا الحجز؟')) { apiDelete('/bookings/' + booking.id).then(() => { toast.success('تم حذف الحجز'); window.location.reload(); }).catch((err) => toast.error(err.message || 'خطأ')); } }}>
                       <Trash2 className="w-3.5 h-3.5" />
                     </Button>
                   </div>
