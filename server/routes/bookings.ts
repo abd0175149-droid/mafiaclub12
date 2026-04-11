@@ -59,6 +59,15 @@ router.post('/', requireAuth, (req: AuthRequest, res) => {
     notifyStmt.run(admin.id, 'حجز جديد', `حجز جديد باسم ${name}`, 'new_booking', 'booking-' + result.lastInsertRowid.toString());
   }
 
+  // Notify location_owner if this activity belongs to their location
+  const activity = db.prepare('SELECT locationId FROM activities WHERE id = ?').get(activityId) as any;
+  if (activity?.locationId) {
+    const owners = db.prepare('SELECT id FROM staff WHERE role = ? AND locationId = ?').all('location_owner', activity.locationId) as any[];
+    for (const owner of owners) {
+      notifyStmt.run(owner.id, 'حجز جديد', `حجز جديد باسم ${name}`, 'new_booking', 'booking-' + result.lastInsertRowid.toString());
+    }
+  }
+
   const booking = db.prepare('SELECT * FROM bookings WHERE id = ?').get(result.lastInsertRowid);
   res.status(201).json(booking);
 });
@@ -84,6 +93,14 @@ router.put('/:id', requireAuth, (req: AuthRequest, res) => {
     const notifyStmt = db.prepare('INSERT INTO notifications (userId, title, message, type, targetId) VALUES (?, ?, ?, ?, ?)');
     for (const admin of admins) {
       notifyStmt.run(admin.id, 'دفعة جديدة', `تم إستلام دفعة للحجز التابع لـ ${existing.name}`, 'financial', 'booking-' + id.toString());
+    }
+    // Notify location_owner
+    const activityData = db.prepare('SELECT locationId FROM activities WHERE id = ?').get(existing.activityId) as any;
+    if (activityData?.locationId) {
+      const owners = db.prepare('SELECT id FROM staff WHERE role = ? AND locationId = ?').all('location_owner', activityData.locationId) as any[];
+      for (const owner of owners) {
+        notifyStmt.run(owner.id, 'دفعة جديدة', `تم إستلام دفعة للحجز التابع لـ ${existing.name}`, 'financial', 'booking-' + id.toString());
+      }
     }
   }
 

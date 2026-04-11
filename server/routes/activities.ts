@@ -33,6 +33,14 @@ router.post('/', requireAuth, requirePermission('activities'), (req: AuthRequest
     }
   }
 
+  // Notify location_owner if activity is at their location
+  if (locationId) {
+    const owners = db.prepare('SELECT id FROM staff WHERE role = ? AND locationId = ?').all('location_owner', locationId) as any[];
+    for (const owner of owners) {
+      notifyStmt.run(owner.id, 'نشاط جديد في مكانك', `تم جدولة نشاط جديد: ${name}`, 'new_activity', 'activity-' + result.lastInsertRowid.toString());
+    }
+  }
+
   const activity = db.prepare('SELECT * FROM activities WHERE id = ?').get(result.lastInsertRowid);
   res.status(201).json(activity);
 });
