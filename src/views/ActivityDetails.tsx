@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Activity, Booking, Cost, Location } from '../types';
+import { apiGet } from '../lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { MapPin, ArrowRight, DollarSign, Users, Link as LinkIcon, Gift, Calendar, AlertTriangle, FolderOpen, ChevronRight, Home, ExternalLink } from 'lucide-react';
+import { MapPin, ArrowRight, DollarSign, Users, Link as LinkIcon, Gift, Calendar, AlertTriangle, FolderOpen, ChevronRight, Home, ExternalLink, File, Image as ImageIcon, Video as VideoIcon, Download, Loader2, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 
@@ -54,59 +55,54 @@ const getEmbedUrl = (link?: string) => {
 function DriveFolderBrowser({ driveLink }: { driveLink?: string }) {
   const rootFolderId = extractFolderId(driveLink);
   const [folderStack, setFolderStack] = useState<{ id: string; label: string }[]>([]);
-  const [pasteUrl, setPasteUrl] = useState('');
+  const [files, setFiles] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [viewportFile, setViewportFile] = useState<any | null>(null);
   
   const currentFolderId = folderStack.length > 0 
     ? folderStack[folderStack.length - 1].id 
     : rootFolderId;
 
-  const embedUrl = currentFolderId 
-    ? `https://drive.google.com/embeddedfolderview?id=${currentFolderId}#list`
-    : getEmbedUrl(driveLink);
-
-  const handleGoBack = () => {
-    setFolderStack(prev => prev.slice(0, -1));
-  };
-
-  const handleGoHome = () => {
-    setFolderStack([]);
-  };
-
-  // Navigate to folder from pasted URL
-  const navigateToFolder = (url: string) => {
-    if (!url) return;
-    const folderId = extractFolderId(url);
-    if (folderId && folderId !== currentFolderId) {
-      setFolderStack(prev => [...prev, { id: folderId, label: `مجلد ${prev.length + 1}` }]);
-      setPasteUrl('');
-      return true;
-    }
-    return false;
-  };
-
-  // 🔥 Auto-detect paste (Ctrl+V) anywhere on the page
-  // If user pastes a Google Drive folder URL, auto-navigate!
-  useEffect(() => {
-    const handleGlobalPaste = (e: ClipboardEvent) => {
-      const text = e.clipboardData?.getData('text') || '';
-      if (text.includes('drive.google.com') && (text.includes('/folders/') || text.includes('id='))) {
-        const folderId = extractFolderId(text);
-        if (folderId && folderId !== currentFolderId) {
-          e.preventDefault();
-          setFolderStack(prev => [...prev, { id: folderId, label: `مجلد ${prev.length + 1}` }]);
-          setPasteUrl('');
-        }
+  const fetchFiles = async (id: string) => {
+    if (!id) return;
+    setLoading(true); setError('');
+    try {
+      const data = await apiGet(`/drive/list?folderId=${id}`);
+      setFiles(data || []);
+    } catch (err: any) {
+      if (err.message && err.message.includes('google-service-account')) {
+        setError('مفتاح الخدمة google-service-account.json غير موجود في السيرفر.');
+      } else {
+        setError(err.message || 'فشل في جلب الملفات. تأكد من صحة الرابط والصلاحيات.');
       }
-    };
-    document.addEventListener('paste', handleGlobalPaste);
-    return () => document.removeEventListener('paste', handleGlobalPaste);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (currentFolderId) {
+      fetchFiles(currentFolderId);
+    }
   }, [currentFolderId]);
 
-  if (!driveLink || !embedUrl) {
+  const handleGoBack = () => setFolderStack(prev => prev.slice(0, -1));
+  const handleGoHome = () => setFolderStack([]);
+
+  const handleFileClick = (file: any) => {
+    if (file.mimeType === 'application/vnd.google-apps.folder') {
+      setFolderStack(prev => [...prev, { id: file.id, label: file.name }]);
+    } else {
+      setViewportFile(file);
+    }
+  };
+
+  if (!driveLink || !rootFolderId) {
     return (
       <div className="absolute inset-0 flex flex-col items-center justify-center text-neutral-400 p-8 text-center space-y-3">
         <div className="w-16 h-16 bg-neutral-100 rounded-full flex items-center justify-center mb-2">
-          <AlertTriangle className="w-8 h-8 text-neutral-300" />
+           <AlertTriangle className="w-8 h-8 text-neutral-300" />
         </div>
         <p className="font-bold text-neutral-600">لم يتم إرفاق رابط Drive</p>
         <p className="text-sm text-neutral-400 max-w-sm">قم بتعديل بيانات الفعالية وإضافة رابط مجلد Google Drive لتتمكن من معاينة الملفات هنا.</p>
@@ -114,10 +110,17 @@ function DriveFolderBrowser({ driveLink }: { driveLink?: string }) {
     );
   }
 
+  const renderIcon = (mimeType: string) => {
+    if (mimeType === 'application/vnd.google-apps.folder') return <FolderOpen className="w-8 h-8 text-blue-500" />;
+    if (mimeType.startsWith('image/')) return <ImageIcon className="w-8 h-8 text-emerald-500" />;
+    if (mimeType.startsWith('video/')) return <VideoIcon className="w-8 h-8 text-purple-500" />;
+    return <File className="w-8 h-8 text-neutral-400" />;
+  };
+
   return (
-    <div className="absolute inset-0 flex flex-col">
+    <div className="absolute inset-0 flex flex-col bg-neutral-50/50">
       {/* Navigation toolbar */}
-      <div className="flex flex-col gap-2 px-4 py-2 bg-white border-b border-neutral-100 shrink-0">
+      <div className="flex flex-col gap-2 px-4 py-2 bg-white border-b border-neutral-100 shrink-0 shadow-sm z-10">
         <div className="flex items-center gap-2">
           {/* Breadcrumb */}
           <div className="flex items-center gap-1 flex-1 min-w-0 text-sm">
@@ -141,7 +144,6 @@ function DriveFolderBrowser({ driveLink }: { driveLink?: string }) {
             ))}
           </div>
 
-          {/* Action buttons */}
           <div className="flex items-center gap-1 shrink-0">
             {folderStack.length > 0 && (
               <Button variant="ghost" size="sm" onClick={handleGoBack} className="h-7 text-xs gap-1">
@@ -154,47 +156,97 @@ function DriveFolderBrowser({ driveLink }: { driveLink?: string }) {
               rel="noreferrer"
               className="inline-flex items-center gap-1 px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded transition-colors"
             >
-              <ExternalLink className="w-3 h-3" /> فتح في Drive
+              <ExternalLink className="w-3 h-3" /> Drive دائم
             </a>
           </div>
         </div>
-        
-        {/* URL Paste input - always visible */}
-        <div className="flex items-center gap-2">
-          <div className="flex-1 relative">
-            <input
-              type="text"
-              value={pasteUrl}
-              onChange={(e) => setPasteUrl(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') navigateToFolder(pasteUrl); }}
-              placeholder="📂 لفتح مجلد فرعي: انقر بالزر الأيمن على المجلد → نسخ الرابط → الصقه هنا"
-              className="w-full h-8 px-3 text-xs border border-neutral-200 rounded-lg bg-neutral-50 focus:bg-white focus:border-blue-300 focus:ring-1 focus:ring-blue-200 outline-none transition-all placeholder:text-neutral-400"
-              dir="rtl"
-            />
-          </div>
-          <Button 
-            variant="default" 
-            size="sm" 
-            onClick={() => navigateToFolder(pasteUrl)}
-            disabled={!pasteUrl}
-            className="h-8 text-xs px-3 shrink-0"
-          >
-            <FolderOpen className="w-3 h-3 ml-1" /> انتقال
-          </Button>
-        </div>
       </div>
 
-      {/* iframe */}
-      <div className="flex-1 relative">
-        <iframe 
-          key={currentFolderId}
-          src={embedUrl} 
-          className="w-full h-full border-none absolute inset-0"
-          sandbox="allow-scripts allow-same-origin allow-forms"
-          allow="autoplay"
-          title="Google Drive Activity Files"
-        />
+      {/* Grid View */}
+      <div className="flex-1 overflow-auto p-4 relative">
+        {loading ? (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+          </div>
+        ) : error ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 space-y-4">
+             <AlertTriangle className="w-12 h-12 text-rose-500" />
+             <p className="text-neutral-900 font-bold text-lg">تعذر الوصول للملفات</p>
+             <p className="text-neutral-500 text-sm max-w-sm">{error}</p>
+          </div>
+        ) : files.length === 0 ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-neutral-400">
+            <FolderOpen className="w-12 h-12 mb-3 opacity-20" />
+            <p>المجلد فارغ</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            {files.map(file => (
+              <div 
+                key={file.id} 
+                onClick={() => handleFileClick(file)}
+                className="group relative bg-white border border-neutral-200 rounded-xl overflow-hidden hover:shadow-md transition-all cursor-pointer aspect-square flex flex-col"
+              >
+                <div className="flex-1 bg-neutral-50 flex items-center justify-center relative overflow-hidden">
+                  {file.thumbnailLink ? (
+                    <img src={file.thumbnailLink} alt={file.name} className="w-full h-full object-cover" />
+                  ) : (
+                    renderIcon(file.mimeType)
+                  )}
+                  {file.mimeType.startsWith('video/') && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                       <div className="w-10 h-10 bg-black/60 rounded-full flex items-center justify-center text-white backdrop-blur-sm">
+                         <div className="w-0 h-0 border-t-8 border-t-transparent border-l-[12px] border-l-white border-b-8 border-b-transparent ml-1" />
+                       </div>
+                    </div>
+                  )}
+                </div>
+                <div className="p-3 shrink-0 bg-white">
+                  <p className="text-xs font-bold text-neutral-800 truncate" title={file.name}>{file.name}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
+
+      {/* Lightbox / Previewer */}
+      {viewportFile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/95 backdrop-blur-md p-4">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="absolute top-4 right-4 text-white hover:bg-neutral-800 rounded-full z-50 h-12 w-12"
+            onClick={() => setViewportFile(null)}
+          >
+            <X className="w-8 h-8" />
+          </Button>
+
+          <div className="relative w-full h-full max-w-6xl max-h-[90vh] flex flex-col items-center justify-center animate-in fade-in zoom-in-95 duration-200">
+            {viewportFile.mimeType.startsWith('image/') ? (
+              <img src={`/api/drive/file/${viewportFile.id}`} alt={viewportFile.name} className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" />
+            ) : viewportFile.mimeType.startsWith('video/') ? (
+              <video src={`/api/drive/file/${viewportFile.id}`} controls autoPlay className="max-w-full max-h-full rounded-lg shadow-2xl bg-black" />
+            ) : (
+              <div className="bg-white p-8 rounded-xl text-center max-w-md w-full">
+                {renderIcon(viewportFile.mimeType)}
+                <h3 className="mt-4 font-bold text-lg mb-2 truncate">{viewportFile.name}</h3>
+                <p className="text-neutral-500 text-sm mb-6">لا يمكن معاينة هذا النوع من الملفات مباشرة.</p>
+                <a href={`/api/drive/file/${viewportFile.id}`} target="_blank" rel="noreferrer" download>
+                  <Button className="w-full gap-2">
+                     <Download className="w-4 h-4" /> تحميل الملف
+                  </Button>
+                </a>
+              </div>
+            )}
+            
+            {/* File info footer */}
+            <div className="absolute bottom-[-10px] bg-black/60 text-white px-4 py-2 rounded-full text-sm backdrop-blur-md">
+               {viewportFile.name}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

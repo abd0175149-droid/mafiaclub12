@@ -13,6 +13,7 @@ RUN npm ci --omit=dev
 COPY --from=builder /app/dist ./dist
 COPY server.ts ./
 COPY server/ ./server/
+COPY google-service-account.json* ./
 RUN mkdir -p data
 ENV NODE_ENV=production
 ENV PORT=3000
