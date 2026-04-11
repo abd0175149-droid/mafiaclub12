@@ -1184,12 +1184,17 @@ function ActivityForm({ locations, fetchAll }: { locations: Location[], fetchAll
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     try {
-      const name = formData.get('name') as string;
       const locationId = formData.get('locationId') as string;
+      const dateStr = formData.get('date') as string;
+      
+      const locName = locations.find(l => l.id.toString() === locationId)?.name || 'نشاط خارجي';
+      const d = new Date(dateStr);
+      const fDate = new Intl.DateTimeFormat('ar-EG', { day: 'numeric', month: 'long' }).format(d);
+      const generatedName = `${locName} ${fDate}`;
 
       await apiPost('/activities', {
-        name,
-        date: new Date(formData.get('date') as string).toISOString(),
+        name: generatedName,
+        date: new Date(dateStr).toISOString(),
         description: formData.get('description'),
         basePrice: Number(formData.get('basePrice')),
         status: 'planned',
@@ -1219,10 +1224,7 @@ function ActivityForm({ locations, fetchAll }: { locations: Location[], fetchAll
           <DialogTitle>إضافة نشاط جديد</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label>اسم النشاط</Label>
-            <Input name="name" required placeholder="مثلاً: ليلة المافيا الكبرى" />
-          </div>
+          {/* تم إزالة حقل اسم النشاط لأنه يتم توليده تلقائيا */}
           <div className="space-y-2">
             <Label>التاريخ</Label>
             <Input name="date" type="datetime-local" required />
