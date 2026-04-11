@@ -40,7 +40,7 @@ import {
   Building2, User as UserIcon, LogOut, Shield, Key, Menu, X, Eye
 } from 'lucide-react';
 import { format, isAfter, startOfDay } from 'date-fns';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from 'recharts';
 
 const safeDate = (date: any) => {
   if (!date) return null;
@@ -141,7 +141,8 @@ export default function Dashboard() {
       const expense = activityCosts.reduce((sum, c) => sum + c.amount, 0);
       const attendees = activityBookings.reduce((sum, b) => sum + b.count, 0);
       const freeAttendees = activityBookings.filter(b => b.isFree).reduce((sum, b) => sum + b.count, 0);
-      statsMap.set(activity.id, { revenue, expense, profit: revenue - expense, attendees, freeAttendees, paidAttendees: attendees - freeAttendees });
+      const paidAttendees = activityBookings.filter(b => b.isPaid && !b.isFree).reduce((sum, b) => sum + b.count, 0);
+      statsMap.set(activity.id, { revenue, expense, profit: revenue - expense, attendees, freeAttendees, paidAttendees });
     });
     return (activityId: string) => statsMap.get(activityId) || { revenue: 0, expense: 0, profit: 0, attendees: 0, freeAttendees: 0, paidAttendees: 0 };
   }, [activities, bookings, costs]);
@@ -164,6 +165,32 @@ export default function Dashboard() {
       expense: stats.expense
     };
   }), [activities, getActivityStats]);
+
+  const last5ActivitiesStats = useMemo(() => activities.slice(0, 5).reverse().map(a => {
+    const stats = getActivityStats(a.id);
+    const unpaid = stats.attendees - stats.freeAttendees - stats.paidAttendees;
+    return {
+      name: a.name,
+      "مدفوع": stats.paidAttendees,
+      "مجاني": stats.freeAttendees,
+      "غير مدفوع": unpaid > 0 ? unpaid : 0
+    };
+  }), [activities, getActivityStats]);
+
+  const upcomingBookingsPieData = useMemo(() => {
+    const upcomingActsIds = upcomingActivities.map(a => a.id);
+    const relatedBookings = bookings.filter(b => upcomingActsIds.includes(b.activityId));
+    
+    const paid = relatedBookings.filter(b => b.isPaid && !b.isFree).reduce((s, b) => s + b.count, 0);
+    const free = relatedBookings.filter(b => b.isFree).reduce((s, b) => s + b.count, 0);
+    const unpaid = relatedBookings.filter(b => !b.isPaid && !b.isFree).reduce((s, b) => s + b.count, 0);
+
+    return [
+      { name: 'مدفوع', value: paid, color: '#10b981' },
+      { name: 'مجاني', value: free, color: '#3b82f6' },
+      { name: 'غير مدفوع', value: unpaid, color: '#f59e0b' }
+    ].filter(item => item.value > 0);
+  }, [upcomingActivities, bookings]);
 
   const toggleLayoutItem = async (item: string) => {
     if (!settings) return;
@@ -394,35 +421,78 @@ export default function Dashboard() {
                 </CardContent>
               </Card>
 
-              {/* Booking Status Chart */}
+              {/* Booking Status Chart (Upcoming) */}
               <Card className="border-none shadow-sm">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <PieChartIcon className="w-5 h-5" /> حالة الحجوزات
+                    <PieChartIcon className="w-5 h-5 text-blue-500" /> الدفع للأنشطة القادمة
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="h-[300px]">
                   {activeTab === 'overview' && !selectedActivity && (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={[
-                        { name: 'مدفوع', count: bookings.filter(b => b.isPaid && !b.isFree).reduce((s, b) => s + b.count, 0), color: '#10b981' },
-                        { name: 'مجاني', count: bookings.filter(b => b.isFree).reduce((s, b) => s + b.count, 0), color: '#3b82f6' },
-                        { name: 'غير مدفوع', count: bookings.filter(b => !b.isPaid && !b.isFree).reduce((s, b) => s + b.count, 0), color: '#f59e0b' }
-                      ]}>
-                        <XAxis dataKey="name" />
-                        <YAxis />
-                        <Tooltip />
-                        <Bar dataKey="count">
-                          {[0, 1, 2].map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={['#10b981', '#3b82f6', '#f59e0b'][index]} />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
+                    <>
+                      {upcomingBookingsPieData.length > 0 ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={upcomingBookingsPieData}
+                              cx="50%"
+                              cy="45%"
+                              innerRadius={60}
+                              outerRadius={80}
+                              paddingAngle={5}
+                              dataKey="value"
+                              label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                              labelLine={false}
+                            >
+                              {upcomingBookingsPieData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.color} />
+                              ))}
+                            </Pie>
+                            <Tooltip formatter={(value) => [`${value} شخص`, 'العدد']} />
+                            <Legend verticalAlign="bottom" height={36} />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center h-full w-full text-neutral-400 pb-8 space-y-2">
+                          <PieChartIcon className="w-8 h-8 opacity-20" />
+                          <p className="text-sm">لا توجد حجوزات لأنشطة قادمة حالياً</p>
+                        </div>
+                      )}
+                    </>
                   )}
                 </CardContent>
               </Card>
             </div>
+
+            {/* Last 5 Activities Comparison Chart */}
+            <Card className="border-none shadow-sm mt-8">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-emerald-500" /> إحصائية الحضور (لآخر 5 أنشطة)
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="h-[350px]">
+                {activeTab === 'overview' && !selectedActivity && (
+                  <ResponsiveContainer width="100%" height="100%">
+                    {last5ActivitiesStats.length > 0 ? (
+                      <BarChart data={last5ActivitiesStats} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e5e5" />
+                        <XAxis dataKey="name" tick={{ fill: '#6b7280' }} axisLine={false} tickLine={false} />
+                        <YAxis tick={{ fill: '#6b7280' }} axisLine={false} tickLine={false} />
+                        <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                        <Legend />
+                        <Bar dataKey="مدفوع" stackId="a" fill="#10b981" radius={[0, 0, 4, 4]} />
+                        <Bar dataKey="مجاني" stackId="a" fill="#3b82f6" />
+                        <Bar dataKey="غير مدفوع" stackId="a" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-neutral-400">لا توجد بيانات سابقة لعرضها</div>
+                    )}
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
           </div>
 
           <div className={activeTab === 'activities' ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
