@@ -290,7 +290,16 @@ export default function ActivityDetails({ activity, location, bookings, costs, o
                     <div className="bg-neutral-50 rounded-lg p-3 border border-neutral-100">
                       <p className="text-xs font-bold text-neutral-500 mb-2 flex items-center gap-1"><Gift className="w-3 h-3" /> عروض المكان</p>
                       <ul className="text-sm space-y-1 list-disc list-inside text-neutral-700">
-                        {location.offers.map((offer, i) => <li key={i} className="line-clamp-2">{offer}</li>)}
+                        {location.offers.map((offer, i) => (
+                          <li key={i} className="line-clamp-2">
+                             {typeof offer === 'string' ? offer : (
+                               <span>
+                                 {offer.description} 
+                                 <Badge variant="outline" className="mr-2 text-rose-500 border-rose-200 bg-rose-50 px-1 py-0!">{offer.price} د.أ</Badge>
+                               </span>
+                             )}
+                          </li>
+                        ))}
                       </ul>
                     </div>
                   )}
