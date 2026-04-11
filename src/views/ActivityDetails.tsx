@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Activity, Booking, Cost, Location } from '../types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -73,14 +73,34 @@ function DriveFolderBrowser({ driveLink }: { driveLink?: string }) {
   };
 
   // Navigate to folder from pasted URL
-  const handlePasteNavigate = (url: string) => {
+  const navigateToFolder = (url: string) => {
     if (!url) return;
     const folderId = extractFolderId(url);
     if (folderId && folderId !== currentFolderId) {
       setFolderStack(prev => [...prev, { id: folderId, label: `مجلد ${prev.length + 1}` }]);
       setPasteUrl('');
+      return true;
     }
+    return false;
   };
+
+  // 🔥 Auto-detect paste (Ctrl+V) anywhere on the page
+  // If user pastes a Google Drive folder URL, auto-navigate!
+  useEffect(() => {
+    const handleGlobalPaste = (e: ClipboardEvent) => {
+      const text = e.clipboardData?.getData('text') || '';
+      if (text.includes('drive.google.com') && (text.includes('/folders/') || text.includes('id='))) {
+        const folderId = extractFolderId(text);
+        if (folderId && folderId !== currentFolderId) {
+          e.preventDefault();
+          setFolderStack(prev => [...prev, { id: folderId, label: `مجلد ${prev.length + 1}` }]);
+          setPasteUrl('');
+        }
+      }
+    };
+    document.addEventListener('paste', handleGlobalPaste);
+    return () => document.removeEventListener('paste', handleGlobalPaste);
+  }, [currentFolderId]);
 
   if (!driveLink || !embedUrl) {
     return (
@@ -146,7 +166,7 @@ function DriveFolderBrowser({ driveLink }: { driveLink?: string }) {
               type="text"
               value={pasteUrl}
               onChange={(e) => setPasteUrl(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') handlePasteNavigate(pasteUrl); }}
+              onKeyDown={(e) => { if (e.key === 'Enter') navigateToFolder(pasteUrl); }}
               placeholder="📂 لفتح مجلد فرعي: انقر بالزر الأيمن على المجلد → نسخ الرابط → الصقه هنا"
               className="w-full h-8 px-3 text-xs border border-neutral-200 rounded-lg bg-neutral-50 focus:bg-white focus:border-blue-300 focus:ring-1 focus:ring-blue-200 outline-none transition-all placeholder:text-neutral-400"
               dir="rtl"
@@ -155,7 +175,7 @@ function DriveFolderBrowser({ driveLink }: { driveLink?: string }) {
           <Button 
             variant="default" 
             size="sm" 
-            onClick={() => handlePasteNavigate(pasteUrl)}
+            onClick={() => navigateToFolder(pasteUrl)}
             disabled={!pasteUrl}
             className="h-8 text-xs px-3 shrink-0"
           >
