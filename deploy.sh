@@ -6,7 +6,8 @@ echo "=============================="
 
 # Pull latest from GitHub
 echo "📥 Pulling latest code..."
-git pull origin main
+git fetch origin
+git reset --hard origin/main
 
 # Build and start
 echo "🐳 Building Docker container..."

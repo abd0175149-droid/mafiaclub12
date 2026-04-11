@@ -20,6 +20,15 @@ router.post('/', requireAuth, requirePermission('finances'), (req: AuthRequest, 
   ).run(item, amount, paidBy || '', source || '', date);
 
   logAudit(req.user!.id, 'create', 'foundational_costs', result.lastInsertRowid.toString());
+
+  const admins = db.prepare('SELECT id FROM staff WHERE role = ?').all('admin') as { id: number }[];
+  const notifyStmt = db.prepare('INSERT INTO notifications (userId, title, message, type, targetId) VALUES (?, ?, ?, ?, ?)');
+  for (const admin of admins) {
+    if (admin.id !== req.user!.id) {
+      notifyStmt.run(admin.id, 'تكلفة تأسيسية', `تم تسجيل مصروف تأسيسي جديد: ${item}`, 'foundational_cost', 'foundational-' + result.lastInsertRowid.toString());
+    }
+  }
+
   const cost = db.prepare('SELECT * FROM foundational_costs WHERE id = ?').get(result.lastInsertRowid);
   res.status(201).json(cost);
 });

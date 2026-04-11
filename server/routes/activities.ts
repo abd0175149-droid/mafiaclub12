@@ -20,6 +20,15 @@ router.post('/', requireAuth, requirePermission('activities'), (req: AuthRequest
   ).run(name, date, description || '', basePrice || 0, status || 'planned', locationId || null, driveLink || '');
 
   logAudit(req.user!.id, 'create', 'activities', Number(result.lastInsertRowid));
+
+  const admins = db.prepare('SELECT id FROM staff WHERE role = ?').all('admin') as { id: number }[];
+  const notifyStmt = db.prepare('INSERT INTO notifications (userId, title, message, type, targetId) VALUES (?, ?, ?, ?, ?)');
+  for (const admin of admins) {
+    if (admin.id !== req.user!.id) {
+      notifyStmt.run(admin.id, 'نشاط جديد', `تم جدولة نشاط جديد: ${name}`, 'new_activity', 'activity-' + result.lastInsertRowid.toString());
+    }
+  }
+
   const activity = db.prepare('SELECT * FROM activities WHERE id = ?').get(result.lastInsertRowid);
   res.status(201).json(activity);
 });

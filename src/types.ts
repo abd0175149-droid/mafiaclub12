@@ -46,7 +46,7 @@ export interface Notification {
   id: string | number;
   title: string;
   message: string;
-  type: 'new_booking' | 'upcoming_activity' | 'cost_alert' | 'financial' | 'new_location';
+  type: 'new_booking' | 'upcoming_activity' | 'cost_alert' | 'financial' | 'new_location' | 'new_activity' | 'foundational_cost';
   read: number;
   createdAt: string;
   userId: string | number;

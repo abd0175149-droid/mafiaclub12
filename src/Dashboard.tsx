@@ -37,7 +37,7 @@ import {
   Plus, Users, DollarSign, Calendar as CalendarIcon, TrendingUp, TrendingDown,
   Trash2, Pencil, CheckCircle2, Clock, Bell, Settings as SettingsIcon,
   LayoutDashboard, AlertTriangle, Info, Check, PieChart as PieChartIcon,
-  Building2, User as UserIcon, LogOut, Shield, Key, Menu, X, Eye
+  Building2, User as UserIcon, LogOut, Shield, Key, Menu, X, Eye, EyeOff
 } from 'lucide-react';
 import { format, isAfter, startOfDay } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from 'recharts';
@@ -314,7 +314,7 @@ export default function Dashboard() {
 
             {/* Desktop/Mobile User Controls */}
             <div className="flex items-center gap-3 dir-ltr">
-              <NotificationCenter notifications={notifications} onNotificationClick={(n) => {
+              <NotificationCenter notifications={notifications} onUpdate={fetchAll} onNotificationClick={(n) => {
                 if (n.type === 'new_booking') setActiveTab('bookings');
                 else if (n.type === 'financial' || n.type === 'cost_alert') setActiveTab('finances');
                 else if (n.type === 'new_location') setActiveTab('locations');
@@ -670,16 +670,36 @@ function KPICard({ title, value, icon, subtitle, trend }: { title: string, value
   );
 }
 
-function NotificationCenter({ notifications, onNotificationClick }: { notifications: Notification[], onNotificationClick?: (n: Notification) => void }) {
+function NotificationCenter({ notifications, onNotificationClick, onUpdate }: { notifications: Notification[], onNotificationClick?: (n: Notification) => void, onUpdate?: () => void }) {
   const unreadCount = notifications.filter(n => !n.read).length;
 
   const markAsRead = async (n: Notification) => {
-    if (!n.read) await apiPut('/notifications/' + n.id + '/read', {});
+    if (!n.read) {
+      await apiPut('/notifications/' + n.id + '/read', {});
+      if (onUpdate) onUpdate();
+    }
     if (onNotificationClick) onNotificationClick(n);
+  };
+
+  const toggleReadStatus = async (e: React.MouseEvent, n: Notification) => {
+    e.stopPropagation();
+    if (n.read) {
+      await apiPut('/notifications/' + n.id + '/unread', {});
+    } else {
+      await apiPut('/notifications/' + n.id + '/read', {});
+    }
+    if (onUpdate) onUpdate();
+  };
+
+  const deleteNotification = async (e: React.MouseEvent, id: string | number) => {
+    e.stopPropagation();
+    await apiDelete('/notifications/' + id);
+    if (onUpdate) onUpdate();
   };
 
   const markAllAsRead = async () => {
     await apiPut('/notifications/read-all', {});
+    if (onUpdate) onUpdate();
   };
 
   return (
@@ -696,12 +716,12 @@ function NotificationCenter({ notifications, onNotificationClick }: { notificati
           </Button>
         }
       />
-      <DropdownMenuContent className="w-80 p-0" align="end">
+      <DropdownMenuContent className="w-[350px] p-0" align="end" dir="rtl">
         <DropdownMenuGroup>
           <DropdownMenuLabel className="p-4 flex items-center justify-between">
-            <span>الإشعارات</span>
+            <span className="font-bold text-base">الإشعارات</span>
             {unreadCount > 0 && (
-              <Button variant="ghost" size="sm" className="text-xs h-auto p-0" onClick={markAllAsRead}>تحديد الكل كمقروء</Button>
+              <Button variant="ghost" size="sm" className="text-xs h-auto p-0 text-blue-600 hover:text-blue-700" onClick={markAllAsRead}>تحديد الكل كمقروء</Button>
             )}
           </DropdownMenuLabel>
         </DropdownMenuGroup>
@@ -710,27 +730,43 @@ function NotificationCenter({ notifications, onNotificationClick }: { notificati
           {notifications.length > 0 ? notifications.map(n => (
             <div
               key={n.id}
-              className={`p-4 border-b border-neutral-50 hover:bg-neutral-50 transition-colors cursor-pointer ${!n.read ? 'bg-blue-50/30' : ''}`}
+              className={`group p-4 border-b border-neutral-100 hover:bg-neutral-50 transition-all cursor-pointer relative ${!n.read ? 'bg-blue-50/20' : 'opacity-70'}`}
               onClick={() => markAsRead(n)}
             >
-              <div className="flex gap-3">
-                <div className={`p-2 rounded-full h-fit ${n.type === 'cost_alert' ? 'bg-rose-100 text-rose-600' :
+              {!n.read && <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-blue-500 rounded-l-full" />}
+              <div className="flex gap-4">
+                <div className={`p-2 rounded-full h-fit flex-shrink-0 ${n.type === 'cost_alert' || n.type === 'foundational_cost' ? 'bg-rose-100 text-rose-600' :
                     n.type === 'new_booking' ? 'bg-emerald-100 text-emerald-600' :
+                    n.type === 'new_activity' ? 'bg-purple-100 text-purple-600' :
                       'bg-blue-100 text-blue-600'
                   }`}>
-                  {n.type === 'cost_alert' ? <AlertTriangle className="w-4 h-4" /> :
+                  {n.type === 'cost_alert' || n.type === 'foundational_cost' ? <AlertTriangle className="w-4 h-4" /> :
                     n.type === 'new_booking' ? <Users className="w-4 h-4" /> :
-                      <CalendarIcon className="w-4 h-4" />}
+                    n.type === 'new_activity' ? <CalendarIcon className="w-4 h-4" /> :
+                      <Bell className="w-4 h-4" />}
                 </div>
-                <div className="space-y-1">
-                  <p className={`text-sm font-bold ${!n.read ? 'text-neutral-900' : 'text-neutral-600'}`}>{n.title}</p>
-                  <p className="text-xs text-neutral-500 leading-relaxed">{n.message}</p>
-                  <p className="text-[10px] text-neutral-400">{format(safeDate(n.createdAt)!, 'hh:mm a - yyyy/MM/dd')}</p>
+                <div className="flex-1 space-y-1">
+                  <div className="flex justify-between items-start">
+                    <p className={`text-sm tracking-tight ${!n.read ? 'font-bold text-neutral-900' : 'font-medium text-neutral-600'}`}>{n.title}</p>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button variant="ghost" size="icon" className="h-6 w-6 text-neutral-400 hover:text-blue-500 hover:bg-blue-50" onClick={(e) => toggleReadStatus(e, n)}>
+                        {n.read ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-6 w-6 text-neutral-400 hover:text-rose-500 hover:bg-rose-50" onClick={(e) => deleteNotification(e, n.id)}>
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                  <p className={`text-xs leading-relaxed ${!n.read ? 'text-neutral-800 font-medium' : 'text-neutral-500'}`}>{n.message}</p>
+                  <p className="text-[10px] text-neutral-400 font-medium">{format(safeDate(n.createdAt)!, 'hh:mm a - yyyy/MM/dd')}</p>
                 </div>
               </div>
             </div>
           )) : (
-            <div className="p-8 text-center text-neutral-400">لا توجد إشعارات حالياً</div>
+            <div className="p-12 flex flex-col items-center justify-center text-center text-neutral-400 space-y-3">
+              <Bell className="w-8 h-8 opacity-20" />
+              <p className="text-sm">لا توجد إشعارات حالياً</p>
+            </div>
           )}
         </ScrollArea>
       </DropdownMenuContent>

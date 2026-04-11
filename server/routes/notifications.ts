@@ -21,5 +21,16 @@ router.put('/read-all', requireAuth, (req: AuthRequest, res) => {
   db.prepare('UPDATE notifications SET read = 1 WHERE userId = ?').run(req.user!.id);
   res.json({ success: true });
 });
+// PUT /api/notifications/:id/unread
+router.put('/:id/unread', requireAuth, (req: AuthRequest, res) => {
+  db.prepare('UPDATE notifications SET read = 0 WHERE id = ? AND userId = ?').run(req.params.id, req.user!.id);
+  res.json({ success: true });
+});
+
+// DELETE /api/notifications/:id
+router.delete('/:id', requireAuth, (req: AuthRequest, res) => {
+  db.prepare('DELETE FROM notifications WHERE id = ? AND userId = ?').run(req.params.id, req.user!.id);
+  res.json({ success: true });
+});
 
 export default router;
