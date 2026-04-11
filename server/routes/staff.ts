@@ -7,7 +7,7 @@ const router = Router();
 
 // GET /api/staff (admin only)
 router.get('/', requireAuth, requireAdmin, (_req, res) => {
-  const rows = db.prepare('SELECT id, username, displayName, role, photoURL, permissions, createdAt FROM staff ORDER BY createdAt DESC').all();
+  const rows = db.prepare('SELECT id, username, displayName, role, photoURL, permissions, lastLogin, createdAt FROM staff ORDER BY createdAt DESC').all();
   res.json(rows);
 });
 

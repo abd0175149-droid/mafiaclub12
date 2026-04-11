@@ -21,6 +21,10 @@ router.post('/login', (req, res) => {
     return res.status(401).json({ error: 'اسم المستخدم أو كلمة المرور غير صحيحة' });
   }
 
+  // Update last login
+  const now = new Date().toISOString();
+  db.prepare('UPDATE staff SET lastLogin = ? WHERE id = ?').run(now, user.id);
+
   let permissions = [];
   try {
     permissions = user.permissions ? JSON.parse(user.permissions) : [];

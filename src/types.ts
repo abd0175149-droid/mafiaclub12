@@ -79,4 +79,5 @@ export interface StaffMember {
   photoURL?: string | null;
   permissions?: string[] | string;
   createdAt: string;
+  lastLogin?: string | null;
 }

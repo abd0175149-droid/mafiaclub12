@@ -197,17 +197,18 @@ export default function UserManagementTab({ users, fetchAll }: { users: StaffMem
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>الاسم والصورة</TableHead>
-                <TableHead>اسم المستخدم</TableHead>
-                <TableHead>الصلاحية الكبرى</TableHead>
-                <TableHead>تاريخ الانضمام</TableHead>
+                <TableHead className="text-right">الاسم والصورة</TableHead>
+                <TableHead className="text-right">اسم المستخدم</TableHead>
+                <TableHead className="text-center">الصلاحية الكبرى</TableHead>
+                <TableHead className="text-center">تاريخ الانضمام</TableHead>
+                <TableHead className="text-center">آخر تسجيل دخول</TableHead>
                 <TableHead className="text-left">الإجراءات</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {users.map(u => (
                 <TableRow key={u.id}>
-                  <TableCell>
+                  <TableCell className="text-right">
                     <div className="flex items-center gap-3">
                        <div className="w-8 h-8 rounded-full bg-neutral-100 flex items-center justify-center overflow-hidden shrink-0 border">
                          {u.photoURL ? <img src={u.photoURL} alt="" className="w-full h-full object-cover" /> : <UserIcon className="w-4 h-4 text-neutral-400" />}
@@ -216,12 +217,13 @@ export default function UserManagementTab({ users, fetchAll }: { users: StaffMem
                     </div>
                   </TableCell>
                   <TableCell dir="ltr" className="text-right">{u.username}</TableCell>
-                  <TableCell>
+                  <TableCell className="text-center">
                     <Badge variant="outline" className={u.role === 'admin' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-blue-50 text-blue-700 border-blue-200'}>
                       {u.role === 'admin' ? 'مسؤول (Admin)' : 'مدير (Manager)'}
                     </Badge>
                   </TableCell>
-                  <TableCell>{u.createdAt ? format(safeDate(u.createdAt)!, 'yyyy/MM/dd') : '-'}</TableCell>
+                  <TableCell className="text-center">{u.createdAt ? format(safeDate(u.createdAt)!, 'yyyy/MM/dd') : '-'}</TableCell>
+                  <TableCell className="text-center text-sm text-neutral-500" dir="ltr">{u.lastLogin ? format(safeDate(u.lastLogin)!, 'yyyy/MM/dd - hh:mm a') : 'لم يسجل الدخول'}</TableCell>
                   <TableCell className="text-left">
                     <div className="flex items-center gap-1 justify-end">
                       <Button variant="ghost" size="icon" className="h-8 w-8 text-neutral-600 hover:text-emerald-600" onClick={() => openEditModal(u)}>
@@ -236,7 +238,7 @@ export default function UserManagementTab({ users, fetchAll }: { users: StaffMem
               ))}
               {users.length === 0 && (
                  <TableRow>
-                   <TableCell colSpan={5} className="text-center py-8 text-neutral-500">لا يوجد موظفين</TableCell>
+                   <TableCell colSpan={6} className="text-center py-8 text-neutral-500">لا يوجد موظفين</TableCell>
                  </TableRow>
               )}
             </TableBody>
