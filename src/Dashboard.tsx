@@ -37,7 +37,7 @@ import {
   Plus, Users, DollarSign, Calendar as CalendarIcon, TrendingUp, TrendingDown,
   Trash2, Pencil, CheckCircle2, Clock, Bell, Settings as SettingsIcon,
   LayoutDashboard, AlertTriangle, Info, Check, PieChart as PieChartIcon,
-  Building2, User as UserIcon, LogOut, Shield, Key, Menu, X
+  Building2, User as UserIcon, LogOut, Shield, Key, Menu, X, Eye
 } from 'lucide-react';
 import { format, isAfter, startOfDay } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
@@ -636,6 +636,7 @@ function BookingsTabContent({ bookings, activities, fetchAll, staff }: { booking
   const [filterActivity, setFilterActivity] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
+  const [viewingBooking, setViewingBooking] = useState<Booking | null>(null);
 
   const filteredBookings = useMemo(() => {
     return bookings.filter(b => {
@@ -741,9 +742,12 @@ function BookingsTabContent({ bookings, activities, fetchAll, staff }: { booking
                 </TableCell>
                 <TableCell className="text-center">{booking.paidAmount} {CURRENCY}</TableCell>
                 <TableCell className="text-right">{booking.receivedBy || '-'}</TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-1">
-                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditingBooking(booking)}>
+                <TableCell className="text-center">
+                  <div className="flex items-center justify-center gap-1">
+                    <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-600" title="عرض التفاصيل" onClick={() => setViewingBooking(booking)}>
+                      <Eye className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button size="icon" variant="ghost" className="h-8 w-8" title="تعديل" onClick={() => setEditingBooking(booking)}>
                       <Pencil className="w-3.5 h-3.5" />
                     </Button>
                     {!booking.isPaid && !booking.isFree && (
@@ -848,6 +852,63 @@ function BookingsTabContent({ bookings, activities, fetchAll, staff }: { booking
                 <Button type="submit" className="w-full">حفظ التعديلات</Button>
               </DialogFooter>
             </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* View Booking Details Dialog */}
+      <Dialog open={!!viewingBooking} onOpenChange={(o) => { if (!o) setViewingBooking(null); }}>
+        <DialogContent dir="rtl" className="max-w-md">
+          <DialogHeader><DialogTitle>تفاصيل الحجز</DialogTitle></DialogHeader>
+          {viewingBooking && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-neutral-50 rounded-lg p-3">
+                  <p className="text-[10px] text-neutral-500 uppercase font-bold mb-1">الاسم</p>
+                  <p className="font-bold text-neutral-900">{viewingBooking.name}</p>
+                </div>
+                <div className="bg-neutral-50 rounded-lg p-3">
+                  <p className="text-[10px] text-neutral-500 uppercase font-bold mb-1">رقم الهاتف</p>
+                  <p className="font-bold text-neutral-900" dir="ltr">{viewingBooking.phone || '-'}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-neutral-50 rounded-lg p-3">
+                  <p className="text-[10px] text-neutral-500 uppercase font-bold mb-1">النشاط</p>
+                  <p className="font-bold text-neutral-900">{activities.find(a => a.id === viewingBooking.activityId)?.name || 'غير معروف'}</p>
+                </div>
+                <div className="bg-neutral-50 rounded-lg p-3">
+                  <p className="text-[10px] text-neutral-500 uppercase font-bold mb-1">عدد الأشخاص</p>
+                  <p className="font-bold text-neutral-900">{viewingBooking.count}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-neutral-50 rounded-lg p-3">
+                  <p className="text-[10px] text-neutral-500 uppercase font-bold mb-1">حالة الدفع</p>
+                  <p className="font-bold">{viewingBooking.isFree ? <span className="text-blue-600">مجاني</span> : viewingBooking.isPaid ? <span className="text-emerald-600">تم الدفع</span> : <span className="text-amber-600">لم يتم الدفع</span>}</p>
+                </div>
+                <div className="bg-neutral-50 rounded-lg p-3">
+                  <p className="text-[10px] text-neutral-500 uppercase font-bold mb-1">المبلغ المدفوع</p>
+                  <p className="font-bold text-neutral-900">{viewingBooking.paidAmount} {CURRENCY}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-neutral-50 rounded-lg p-3">
+                  <p className="text-[10px] text-neutral-500 uppercase font-bold mb-1">الموظف المستلم</p>
+                  <p className="font-bold text-neutral-900">{viewingBooking.receivedBy || '-'}</p>
+                </div>
+                <div className="bg-neutral-50 rounded-lg p-3">
+                  <p className="text-[10px] text-neutral-500 uppercase font-bold mb-1">تاريخ التسجيل</p>
+                  <p className="font-bold text-neutral-900 text-sm">{viewingBooking.createdAt ? format(new Date(viewingBooking.createdAt), 'yyyy/MM/dd - hh:mm a') : '-'}</p>
+                </div>
+              </div>
+              {viewingBooking.notes && (
+                <div className="bg-amber-50 rounded-lg p-3 border border-amber-100">
+                  <p className="text-[10px] text-amber-600 uppercase font-bold mb-1">ملاحظات</p>
+                  <p className="text-sm text-neutral-700">{viewingBooking.notes}</p>
+                </div>
+              )}
+            </div>
           )}
         </DialogContent>
       </Dialog>
