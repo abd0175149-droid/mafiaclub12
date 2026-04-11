@@ -11,6 +11,7 @@ import ProfileTab from './views/ProfileSettings';
 import UserManagementTab from './views/UserManagementTab';
 import { ImageCropper } from '@/components/ImageCropper';
 import { Button } from '@/components/ui/button';
+import { PaginationControls, usePagination } from '@/components/Pagination';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
@@ -150,6 +151,8 @@ export default function Dashboard() {
   const upcomingActivities = useMemo(() => activities
     .filter(a => isAfter(safeDate(a.date)!, startOfDay(new Date())) && a.status !== 'cancelled')
     .sort((a, b) => safeDate(a.date)!.getTime() - safeDate(b.date)!.getTime()), [activities]);
+
+  const activitiesPagination = usePagination(activities, 12);
 
   const activeBookingsCount = useMemo(() => bookings.filter(b => {
     const activity = activities.find(a => a.id === b.activityId);
@@ -504,25 +507,38 @@ export default function Dashboard() {
                 </div>
                 <ActivityForm locations={locations} fetchAll={fetchAll} />
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {activities.length > 0 ? activities.map(activity => (
-                  <div key={activity.id}>
-                    <ActivityCard 
-                      activity={activity} 
-                      stats={getActivityStats(activity.id)} 
-                      onDelete={() => handleDeleteActivity(activity)} 
-                      onStatusChange={fetchAll} 
-                      onSelect={() => setSelectedActivity(activity)} 
-                      onEdit={() => setEditingActivityMain(activity)}
-                    />
-                  </div>
-                )) : (
-                  <div className="col-span-full text-center py-16 text-neutral-400">
-                    <CalendarIcon className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                    <p className="text-lg font-medium">لا توجد أنشطة حالياً</p>
-                    <p className="text-sm">ابدأ بإضافة نشاط جديد</p>
-                  </div>
-                )}
+              <div className="flex flex-col gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {activities.length > 0 ? activitiesPagination.paginatedData.map(activity => (
+                    <div key={activity.id}>
+                      <ActivityCard 
+                        activity={activity} 
+                        stats={getActivityStats(activity.id)} 
+                        onDelete={() => handleDeleteActivity(activity)} 
+                        onStatusChange={fetchAll} 
+                        onSelect={() => setSelectedActivity(activity)} 
+                        onEdit={() => setEditingActivityMain(activity)}
+                      />
+                    </div>
+                  )) : (
+                    <div className="col-span-full text-center py-16 text-neutral-400">
+                      <CalendarIcon className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                      <p className="text-lg font-medium">لا توجد أنشطة حالياً</p>
+                      <p className="text-sm">ابدأ بإضافة نشاط جديد</p>
+                    </div>
+                  )}
+                </div>
+                
+                <PaginationControls
+                  currentPage={activitiesPagination.currentPage}
+                  totalPages={activitiesPagination.totalPages}
+                  itemsPerPage={activitiesPagination.itemsPerPage}
+                  totalItems={activities.length}
+                  onPageChange={activitiesPagination.setCurrentPage}
+                  onItemsPerPageChange={activitiesPagination.setItemsPerPage}
+                  itemsPerPageOptions={[6, 12, 24, 48]}
+                  label="نشاط"
+                />
               </div>
             </div>
             {/* Edit Activity Dialog */}
@@ -877,6 +893,8 @@ function BookingsTabContent({ bookings, activities, fetchAll, staff, profile }: 
     });
   }, [bookings, searchQuery, filterActivity, filterStatus]);
 
+  const bookingsPagination = usePagination(filteredBookings, 10);
+
   const handleEditSave = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!editingBooking) return;
@@ -951,7 +969,7 @@ function BookingsTabContent({ bookings, activities, fetchAll, staff, profile }: 
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredBookings.length > 0 ? filteredBookings.map(booking => (
+            {filteredBookings.length > 0 ? bookingsPagination.paginatedData.map(booking => (
               <TableRow key={booking.id} id={'glow-booking-' + booking.id}>
                 <TableCell className="font-medium text-right">{booking.name}</TableCell>
                 <TableCell className="text-right">{activities.find(a => a.id === booking.activityId)?.name || 'غير معروف'}</TableCell>
@@ -1039,6 +1057,15 @@ function BookingsTabContent({ bookings, activities, fetchAll, staff, profile }: 
             )}
           </TableBody>
         </Table>
+        <PaginationControls
+          currentPage={bookingsPagination.currentPage}
+          totalPages={bookingsPagination.totalPages}
+          itemsPerPage={bookingsPagination.itemsPerPage}
+          totalItems={filteredBookings.length}
+          onPageChange={bookingsPagination.setCurrentPage}
+          onItemsPerPageChange={bookingsPagination.setItemsPerPage}
+          label="حجز"
+        />
       </CardContent>
 
       {/* Edit Booking Dialog [BL-05, F-03] */}

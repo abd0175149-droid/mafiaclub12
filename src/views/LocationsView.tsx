@@ -6,12 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PaginationControls, usePagination } from '@/components/Pagination';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { MapPin, Plus, Trash2, Edit2, Link as LinkIcon, Gift } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function LocationsView() {
   const [locations, setLocations] = useState<Location[]>([]);
+  const locationsPagination = usePagination(locations, 6);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingLoc, setEditingLoc] = useState<Location | null>(null);
 
@@ -163,7 +165,7 @@ export default function LocationsView() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {locations.map(loc => (
+        {locationsPagination.paginatedData.map(loc => (
           <Card key={loc.id} id={'glow-location-' + loc.id} className="border-none shadow-sm hover:shadow-md transition-all group">
             <CardHeader className="pb-3 border-b border-neutral-100">
               <CardTitle className="text-lg flex justify-between items-center">
@@ -211,6 +213,16 @@ export default function LocationsView() {
           </div>
         )}
       </div>
+      <PaginationControls
+        currentPage={locationsPagination.currentPage}
+        totalPages={locationsPagination.totalPages}
+        itemsPerPage={locationsPagination.itemsPerPage}
+        totalItems={locations.length}
+        onPageChange={locationsPagination.setCurrentPage}
+        onItemsPerPageChange={locationsPagination.setItemsPerPage}
+        itemsPerPageOptions={[6, 12, 24, 48]}
+        label="مكان"
+      />
     </div>
   );
 }

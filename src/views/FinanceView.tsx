@@ -3,6 +3,7 @@ import { Activity, Booking, Cost, FoundationalCost, StaffMember } from '../types
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { PaginationControls, usePagination } from '@/components/Pagination';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -147,6 +148,9 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
   }));
   const transactions = [...revenues, ...expenses].sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
 
+  const transactionsPagination = usePagination(transactions, 10);
+  const foundationalPagination = usePagination(foundationalCosts, 10);
+
   return (
     <div className="flex flex-col md:flex-row gap-6 h-[calc(100vh-100px)]">
       
@@ -204,7 +208,7 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {transactions.map(t => (
+                  {transactionsPagination.paginatedData.map(t => (
                     <TableRow key={t.id} id={'glow-' + (t.type === 'revenue' ? `booking-${t.rawId}` : `cost-${t.rawId}`)}>
                        <TableCell className="text-xs text-neutral-500">{t.date ? format(new Date(t.date), 'dd/MM HH:mm') : '-'}</TableCell>
                        <TableCell className="font-bold">{t.description}</TableCell>
@@ -224,6 +228,15 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
                 </TableBody>
               </Table>
             </div>
+            <PaginationControls
+              currentPage={transactionsPagination.currentPage}
+              totalPages={transactionsPagination.totalPages}
+              itemsPerPage={transactionsPagination.itemsPerPage}
+              totalItems={transactions.length}
+              onPageChange={transactionsPagination.setCurrentPage}
+              onItemsPerPageChange={transactionsPagination.setItemsPerPage}
+              label="حركة"
+            />
           </div>
         )}
 
@@ -258,7 +271,7 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
                    </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {foundationalCosts.map(cost => (
+                  {foundationalPagination.paginatedData.map(cost => (
                     <TableRow key={cost.id}>
                       <TableCell className="text-xs text-neutral-500">{cost.date ? format(new Date(cost.date), 'dd/MM/yyyy') : '-'}</TableCell>
                       <TableCell className="font-bold">{cost.item}</TableCell>
@@ -296,6 +309,15 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
                 </TableBody>
               </Table>
             </div>
+            <PaginationControls
+              currentPage={foundationalPagination.currentPage}
+              totalPages={foundationalPagination.totalPages}
+              itemsPerPage={foundationalPagination.itemsPerPage}
+              totalItems={foundationalCosts.length}
+              onPageChange={foundationalPagination.setCurrentPage}
+              onItemsPerPageChange={foundationalPagination.setItemsPerPage}
+              label="مصروف"
+            />
           </div>
         )}
 
