@@ -153,7 +153,7 @@ export default function Dashboard() {
   const activeBookingsCount = useMemo(() => bookings.filter(b => {
     const activity = activities.find(a => a.id === b.activityId);
     return activity && isAfter(safeDate(activity.date)!, startOfDay(new Date()));
-  }).length, [bookings, activities]);
+  }).reduce((sum, b) => sum + b.count, 0), [bookings, activities]);
 
   const chartData = useMemo(() => activities.slice(0, 5).reverse().map(a => {
     const stats = getActivityStats(a.id);
@@ -332,7 +332,7 @@ export default function Dashboard() {
           </div>
         </header>
 
-        <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
+        <div className="p-4 md:p-8 max-w-[1600px] mx-auto space-y-8">
 
           <div className={activeTab === 'overview' ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
             <h2 className="text-2xl font-bold mb-6">نظرة عامة والتحليلات</h2>
@@ -405,9 +405,9 @@ export default function Dashboard() {
                   {activeTab === 'overview' && !selectedActivity && (
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={[
-                        { name: 'مدفوع', count: bookings.filter(b => b.isPaid && !b.isFree).length, color: '#10b981' },
-                        { name: 'مجاني', count: bookings.filter(b => b.isFree).length, color: '#3b82f6' },
-                        { name: 'غير مدفوع', count: bookings.filter(b => !b.isPaid && !b.isFree).length, color: '#f59e0b' }
+                        { name: 'مدفوع', count: bookings.filter(b => b.isPaid && !b.isFree).reduce((s, b) => s + b.count, 0), color: '#10b981' },
+                        { name: 'مجاني', count: bookings.filter(b => b.isFree).reduce((s, b) => s + b.count, 0), color: '#3b82f6' },
+                        { name: 'غير مدفوع', count: bookings.filter(b => !b.isPaid && !b.isFree).reduce((s, b) => s + b.count, 0), color: '#f59e0b' }
                       ]}>
                         <XAxis dataKey="name" />
                         <YAxis />
