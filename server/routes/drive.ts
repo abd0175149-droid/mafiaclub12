@@ -2,7 +2,14 @@ import { Router, Request, Response } from 'express';
 import { google } from 'googleapis';
 import path from 'path';
 import fs from 'fs';
+import multer from 'multer';
+import { Readable } from 'stream';
 import { requireAuth } from '../middleware/auth.js';
+
+const upload = multer({ 
+  storage: multer.memoryStorage(), 
+  limits: { fileSize: 50 * 1024 * 1024 } // 50MB
+});
 
 const router = Router();
 
@@ -14,7 +21,7 @@ const getDriveService = () => {
   }
   const auth = new google.auth.GoogleAuth({
     keyFile: SERVICE_ACCOUNT_FILE,
-    scopes: ['https://www.googleapis.com/auth/drive.readonly'],
+    scopes: ['https://www.googleapis.com/auth/drive'],
   });
   return google.drive({ version: 'v3', auth });
 };
@@ -82,6 +89,58 @@ router.get('/file/:id', async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('Error streaming file:', error.message);
     res.status(500).send(error.message);
+  }
+});
+
+// POST /api/drive/upload
+router.post('/upload', requireAuth, upload.single('media'), async (req: Request, res: Response) => {
+  try {
+    const file = req.file;
+    const folderId = req.body.folderId as string;
+
+    if (!file) return res.status(400).json({ error: 'لم يتم إرسال أي ملف' });
+    if (!folderId) return res.status(400).json({ error: 'مطلوب folderId' });
+
+    const drive = getDriveService();
+
+    // Convert Buffer to Readable Stream
+    const bufferStream = new Readable();
+    bufferStream.push(file.buffer);
+    bufferStream.push(null);
+
+    const response = await drive.files.create({
+      requestBody: {
+        name: file.originalname,
+        parents: [folderId],
+      },
+      media: {
+        mimeType: file.mimetype,
+        body: bufferStream,
+      },
+      fields: 'id, name, mimeType, thumbnailLink, size'
+    });
+
+    res.status(201).json(response.data);
+  } catch (error: any) {
+    console.error('Drive Upload Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE /api/drive/file/:id
+router.delete('/file/:id', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const fileId = req.params.id;
+    if (!fileId) return res.status(400).json({ error: 'مطلوب fileId' });
+
+    const drive = getDriveService();
+    
+    await drive.files.delete({ fileId });
+
+    res.json({ success: true, message: 'تم حذف الملف بنجاح' });
+  } catch (error: any) {
+    console.error('Drive Delete Error:', error.message);
+    res.status(500).json({ error: error.message });
   }
 });
 

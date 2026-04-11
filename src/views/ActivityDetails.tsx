@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Activity, Booking, Cost, Location } from '../types';
-import { apiGet } from '../lib/api';
+import { apiGet, apiDelete } from '../lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { MapPin, ArrowRight, DollarSign, Users, Link as LinkIcon, Gift, Calendar, AlertTriangle, FolderOpen, ChevronRight, Home, ExternalLink, File, Image as ImageIcon, Video as VideoIcon, Download, Loader2, X } from 'lucide-react';
+import { MapPin, ArrowRight, DollarSign, Users, Link as LinkIcon, Gift, Calendar, AlertTriangle, FolderOpen, ChevronRight, Home, ExternalLink, File, Image as ImageIcon, Video as VideoIcon, Download, Loader2, X, Upload, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
+import Swal from 'sweetalert2';
 
 interface ActivityDetailsProps {
   activity: Activity;
@@ -60,6 +62,9 @@ function DriveFolderBrowser({ driveLink }: { driveLink?: string }) {
   const [error, setError] = useState('');
   const [viewportFile, setViewportFile] = useState<any | null>(null);
   
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  
   const currentFolderId = folderStack.length > 0 
     ? folderStack[folderStack.length - 1].id 
     : rootFolderId;
@@ -95,6 +100,55 @@ function DriveFolderBrowser({ driveLink }: { driveLink?: string }) {
       setFolderStack(prev => [...prev, { id: file.id, label: file.name }]);
     } else {
       setViewportFile(file);
+    }
+  };
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('media', file);
+    formData.append('folderId', currentFolderId);
+
+    setIsUploading(true);
+    try {
+      const res = await fetch('/api/drive/upload', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + localStorage.getItem('token')
+        },
+        body: formData
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        throw new Error(d.error || 'فشل رفع الملف');
+      }
+      toast.success('تم رفع الملف بنجاح');
+      fetchFiles(currentFolderId);
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleDeleteFile = async (e: React.MouseEvent, fileId: string, fileName: string) => {
+    e.stopPropagation();
+    const r = await Swal.fire({ title: 'حذف الملف؟', text: `سيتم حذف ${fileName} بغير رجعة، تأكيد؟`, icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'احذف', cancelButtonText: 'إلغاء' });
+    if (!r.isConfirmed) return;
+    
+    try {
+      await apiDelete(`/drive/file/${fileId}`);
+      toast.success('تم حذف الملف');
+      setFiles(prev => prev.filter(f => f.id !== fileId));
+    } catch (err: any) {
+      toast.error(err.message || 'خطأ في الحذف');
     }
   };
 
@@ -150,6 +204,17 @@ function DriveFolderBrowser({ driveLink }: { driveLink?: string }) {
                 <ArrowRight className="w-3 h-3" /> رجوع
               </Button>
             )}
+            {/* hidden upload input */}
+            <input type="file" ref={fileInputRef} onChange={handleFileSelected} className="hidden" />
+            <Button 
+              size="sm" 
+              onClick={handleUploadClick} 
+              disabled={isUploading}
+              className="h-7 px-3 text-xs bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1"
+            >
+              {isUploading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
+              رفع
+            </Button>
             <a 
               href={`https://drive.google.com/drive/folders/${currentFolderId}`}
               target="_blank"
@@ -187,7 +252,7 @@ function DriveFolderBrowser({ driveLink }: { driveLink?: string }) {
                 onClick={() => handleFileClick(file)}
                 className="group relative bg-white border border-neutral-200 rounded-xl overflow-hidden hover:shadow-md transition-all cursor-pointer aspect-square flex flex-col"
               >
-                <div className="flex-1 bg-neutral-50 flex items-center justify-center relative overflow-hidden">
+                <div className="flex-1 bg-neutral-50 flex items-center justify-center relative overflow-hidden group">
                   {file.thumbnailLink ? (
                     <img src={file.thumbnailLink} alt={file.name} className="w-full h-full object-cover" />
                   ) : (
@@ -199,6 +264,17 @@ function DriveFolderBrowser({ driveLink }: { driveLink?: string }) {
                          <div className="w-0 h-0 border-t-8 border-t-transparent border-l-[12px] border-l-white border-b-8 border-b-transparent ml-1" />
                        </div>
                     </div>
+                  )}
+
+                  {/* Delete Button overlaid on hover */}
+                  {file.mimeType !== 'application/vnd.google-apps.folder' && (
+                    <button 
+                      onClick={(e) => handleDeleteFile(e, file.id, file.name)} 
+                      className="absolute top-2 right-2 p-1.5 bg-rose-500 hover:bg-rose-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                      title="حذف الملف"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
                   )}
                 </div>
                 <div className="p-3 shrink-0 bg-white">
