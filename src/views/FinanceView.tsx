@@ -102,12 +102,13 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
 
   const showPartnerStats = (personPaidBy: string) => {
     if (!personPaidBy) return;
-    const partnerCount = Math.max(staff.filter(s => s.role === 'admin' || s.isPartner === 1 || s.isPartner === true).length, 1);
-    const grandTotal = foundationalCosts.reduce((s, c) => s + c.amount, 0);
+    const cleanPerson = String(personPaidBy).trim();
+    const partnerCount = Math.max(staff.filter(s => s.isPartner === 1 || s.isPartner === true).length, 1);
+    const grandTotal = foundationalCosts.reduce((s, c) => s + Number(c.amount || 0), 0);
     if (grandTotal === 0) return;
 
-    const allProcessedTotal = foundationalCosts.filter(c => c.isProcessed === 1 || c.isProcessed === true).reduce((s, c) => s + c.amount, 0);
-    const personUnprocessed = foundationalCosts.filter(c => c.paidBy === personPaidBy && (!c.isProcessed || c.isProcessed === 0)).reduce((s, c) => s + c.amount, 0);
+    const allProcessedTotal = foundationalCosts.filter(c => c.isProcessed == 1 || c.isProcessed === true).reduce((s, c) => s + Number(c.amount || 0), 0);
+    const personUnprocessed = foundationalCosts.filter(c => String(c.paidBy).trim() === cleanPerson && c.isProcessed != 1 && c.isProcessed !== true).reduce((s, c) => s + Number(c.amount || 0), 0);
     
     const fraction = (personUnprocessed + (allProcessedTotal / partnerCount)) / grandTotal;
     const percentage = (fraction * 100).toFixed(2);
