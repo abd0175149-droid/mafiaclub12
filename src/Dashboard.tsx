@@ -83,6 +83,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
 
   const isAdmin = profile?.role === 'admin';
+  const isLocationOwner = profile?.role === 'location_owner';
 
   const fetchAll = useCallback(async () => {
     try {
@@ -278,9 +279,9 @@ export default function Dashboard() {
             { id: 'activities', icon: CalendarIcon, label: 'الأنشطة المجدولة', reqPerm: 'activities' },
             { id: 'bookings', icon: Users, label: 'قاعدة الحجوزات', reqPerm: 'bookings' },
             { id: 'finances', icon: DollarSign, label: 'المالية الشاملة', reqPerm: 'finances' },
-            { id: 'locations', icon: PieChartIcon, label: 'أماكن الفعاليات', reqPerm: 'locations' },
+            ...(!isLocationOwner ? [{ id: 'locations', icon: PieChartIcon, label: 'أماكن الفعاليات', reqPerm: 'locations' }] : []),
           ].map(tc => {
-            const hasPerm = isAdmin || !tc.reqPerm || (Array.isArray(profile?.permissions) && profile.permissions.includes(tc.reqPerm));
+            const hasPerm = isAdmin || isLocationOwner || !tc.reqPerm || (Array.isArray(profile?.permissions) && profile.permissions.includes(tc.reqPerm));
             if (!hasPerm) return null;
             return (
               <button
@@ -508,7 +509,7 @@ export default function Dashboard() {
                   <h2 className="text-2xl font-bold">الأنشطة المجدولة</h2>
                   <p className="text-neutral-500">إدارة الجلسات والفعاليات</p>
                 </div>
-                <ActivityForm locations={locations} fetchAll={fetchAll} />
+                {!isLocationOwner && <ActivityForm locations={locations} fetchAll={fetchAll} />}
               </div>
               <div className="flex flex-col gap-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -517,10 +518,10 @@ export default function Dashboard() {
                       <ActivityCard 
                         activity={activity} 
                         stats={getActivityStats(activity.id)} 
-                        onDelete={() => handleDeleteActivity(activity)} 
-                        onStatusChange={fetchAll} 
-                        onSelect={() => setSelectedActivity(activity)} 
-                        onEdit={() => setEditingActivityMain(activity)}
+                        onDelete={isLocationOwner ? undefined : (() => handleDeleteActivity(activity))} 
+                        onStatusChange={isLocationOwner ? undefined : fetchAll} 
+                        onSelect={isLocationOwner ? undefined : (() => setSelectedActivity(activity))} 
+                        onEdit={isLocationOwner ? undefined : (() => setEditingActivityMain(activity))}
                       />
                     </div>
                   )) : (
@@ -841,32 +842,40 @@ const ActivityCard: React.FC<ActivityCardProps> = ({ activity, stats, onDelete, 
         </div>
         {/* Status + View + Delete */}
         <div className="flex items-center gap-2 pt-2 border-t border-neutral-100">
-          <Select
-            value={activity.status}
-            onValueChange={async (v) => { try { await apiPut('/activities/' + activity.id, { status: v }); if (onStatusChange) onStatusChange(); } catch (e) { console.error(e); } }}
-          >
-            <SelectTrigger className="h-8 text-xs flex-1">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="planned">مخطط له</SelectItem>
-              <SelectItem value="active">نشط</SelectItem>
-              <SelectItem value="completed">مكتمل</SelectItem>
-              <SelectItem value="cancelled">ملغي</SelectItem>
-            </SelectContent>
-          </Select>
+          {onStatusChange ? (
+            <Select
+              value={activity.status}
+              onValueChange={async (v) => { try { await apiPut('/activities/' + activity.id, { status: v }); if (onStatusChange) onStatusChange(); } catch (e) { console.error(e); } }}
+            >
+              <SelectTrigger className="h-8 text-xs flex-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="planned">مخطط له</SelectItem>
+                <SelectItem value="active">نشط</SelectItem>
+                <SelectItem value="completed">مكتمل</SelectItem>
+                <SelectItem value="cancelled">ملغي</SelectItem>
+              </SelectContent>
+            </Select>
+          ) : (
+            <Badge variant="outline" className={`${STATUS_COLORS[activity.status]} flex-1 justify-center py-1.5`}>{STATUS_LABELS[activity.status]}</Badge>
+          )}
           <div className="flex items-center gap-1">
-            {activity.status === 'planned' && (
+            {onEdit && activity.status === 'planned' && (
               <button type="button" title="تعديل النشاط" className="inline-flex items-center justify-center text-amber-500 h-8 w-8 rounded-md hover:bg-amber-50 transition-colors" onClick={() => { if (onEdit) onEdit(); }}>
                 <Pencil className="w-4 h-4" />
               </button>
             )}
-            <button type="button" title="عرض التفاصيل" className="inline-flex items-center justify-center text-blue-600 h-8 w-8 rounded-md hover:bg-blue-50 transition-colors" onClick={() => { console.log('[CARD] View details:', activity.id); if (onSelect) onSelect(); }}>
-              <Info className="w-4 h-4" />
-            </button>
-            <button type="button" title="حذف" className="inline-flex items-center justify-center text-rose-500 h-8 w-8 rounded-md hover:bg-rose-50 transition-colors" onClick={() => { console.log('[CARD] Delete clicked:', activity.id); if (onDelete) onDelete(); }}>
-              <Trash2 className="w-4 h-4" />
-            </button>
+            {onSelect && (
+              <button type="button" title="عرض التفاصيل" className="inline-flex items-center justify-center text-blue-600 h-8 w-8 rounded-md hover:bg-blue-50 transition-colors" onClick={() => { if (onSelect) onSelect(); }}>
+                <Info className="w-4 h-4" />
+              </button>
+            )}
+            {onDelete && (
+              <button type="button" title="حذف" className="inline-flex items-center justify-center text-rose-500 h-8 w-8 rounded-md hover:bg-rose-50 transition-colors" onClick={() => { if (onDelete) onDelete(); }}>
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
       </CardContent>

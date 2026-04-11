@@ -5,10 +5,18 @@ import { type AuthRequest, requireAuth } from '../middleware/auth.js';
 const router = Router();
 
 // GET /api/bookings?search=&activityId=&status=
-router.get('/', requireAuth, (req, res) => {
+router.get('/', requireAuth, (req: AuthRequest, res) => {
   let sql = 'SELECT * FROM bookings';
   const conditions: string[] = [];
   const params: any[] = [];
+
+  // location_owner: restrict to their location's activities
+  if (req.user?.role === 'location_owner' && req.user.locationId) {
+    const activityIds = (db.prepare('SELECT id FROM activities WHERE locationId = ?').all(req.user.locationId) as any[]).map(a => a.id);
+    if (activityIds.length === 0) return res.json([]);
+    conditions.push(`activityId IN (${activityIds.map(() => '?').join(',')})`);
+    params.push(...activityIds);
+  }
 
   if (req.query.activityId && req.query.activityId !== 'all') {
     conditions.push('activityId = ?');

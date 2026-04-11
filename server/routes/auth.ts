@@ -25,19 +25,20 @@ router.post('/login', (req, res) => {
   const now = new Date().toISOString();
   db.prepare('UPDATE staff SET lastLogin = ? WHERE id = ?').run(now, user.id);
 
-  let permissions = [];
+  let permissions: string[] = [];
   try {
     permissions = user.permissions ? JSON.parse(user.permissions) : [];
   } catch (e) {
     permissions = [];
   }
 
-  const tokenPayload = {
+  const tokenPayload: any = {
     id: user.id,
     username: user.username,
     displayName: user.displayName,
     role: user.role,
-    permissions
+    permissions,
+    locationId: user.locationId || null
   };
 
   const token = generateToken(tokenPayload);
@@ -47,11 +48,12 @@ router.post('/login', (req, res) => {
 
 // GET /api/auth/me - fetch fresh profile from DB (includes photoURL)
 router.get('/me', requireAuth, (req: AuthRequest, res) => {
-  const user = db.prepare('SELECT id, username, displayName, role, photoURL, permissions FROM staff WHERE id = ?').get(req.user!.id) as any;
+  const user = db.prepare('SELECT id, username, displayName, role, photoURL, permissions, locationId FROM staff WHERE id = ?').get(req.user!.id) as any;
   if (!user) return res.status(404).json({ error: 'المستخدم غير موجود' });
-  let permissions = [];
+  let permissions: string[] = [];
   try { permissions = user.permissions ? JSON.parse(user.permissions) : []; } catch { permissions = []; }
-  res.json({ profile: { ...user, permissions, photoURL: user.photoURL || null } });
+  res.json({ profile: { ...user, permissions, photoURL: user.photoURL || null, locationId: user.locationId || null } });
 });
 
 export default router;
+

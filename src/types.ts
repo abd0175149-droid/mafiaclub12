@@ -76,10 +76,11 @@ export interface StaffMember {
   id: string | number;
   username: string;
   displayName: string;
-  role: 'admin' | 'manager';
+  role: 'admin' | 'manager' | 'location_owner';
   photoURL?: string | null;
   permissions?: string[] | string;
   createdAt: string;
   lastLogin?: string | null;
   isPartner?: number | boolean;
+  locationId?: number | null;
 }

@@ -22,6 +22,7 @@ export default function LocationsView() {
   const [offers, setOffers] = useState<{description: string, price: number}[]>([]);
   const [newOfferDesc, setNewOfferDesc] = useState('');
   const [newOfferPrice, setNewOfferPrice] = useState('');
+  const [ownerUsername, setOwnerUsername] = useState('');
 
   const fetchLocations = async () => {
     try {
@@ -55,6 +56,7 @@ export default function LocationsView() {
     setOffers([]);
     setNewOfferDesc('');
     setNewOfferPrice('');
+    setOwnerUsername('');
     setIsDialogOpen(true);
   };
 
@@ -76,15 +78,33 @@ export default function LocationsView() {
   const handleSave = async () => {
     if (!name.trim()) return toast.error('يرجى كتابة اسم المكان');
     try {
-      const payload = { name, mapUrl, offers };
+      const payload = { name, mapUrl, offers, ownerUsername: ownerUsername.trim() || undefined };
       if (editingLoc) {
         await apiPut(`/locations/${editingLoc.id}`, payload);
         toast.success('تم التعديل بنجاح');
       } else {
-        await apiPost('/locations', payload);
+        const result = await apiPost('/locations', payload) as any;
         toast.success('تمت الإضافة بنجاح');
+        // Show created owner account info
+        if (result?.ownerAccount) {
+          Swal.fire({
+            title: 'تم إنشاء حساب صاحب المكان',
+            html: `
+              <div style="text-align:right; direction:rtl; line-height:2;">
+                <p><strong>اسم المستخدم:</strong> <code style="background:#f3f4f6;padding:2px 8px;border-radius:4px;">${result.ownerAccount.username}</code></p>
+                <p><strong>كلمة المرور:</strong> <code style="background:#f3f4f6;padding:2px 8px;border-radius:4px;">${result.ownerAccount.password}</code></p>
+                <hr style="margin:10px 0"/>
+                <p style="color:#6b7280;font-size:13px;">يمكن لصاحب المكان تسجيل الدخول بهذه البيانات لمتابعة الأنشطة والحجوزات المرتبطة بمكانه</p>
+              </div>
+            `,
+            icon: 'success',
+            confirmButtonText: 'تم',
+            confirmButtonColor: '#0f172a'
+          });
+        }
       }
       setIsDialogOpen(false);
+      setOwnerUsername('');
       fetchLocations();
     } catch (err: any) {
       toast.error(err.message || 'حدث خطأ عند الحفظ');
@@ -127,6 +147,13 @@ export default function LocationsView() {
                 <Label>اسم المكان (الكافيه / القهوة) <span className="text-red-500">*</span></Label>
                 <Input value={name} onChange={e => setName(e.target.value)} placeholder="مثال: The Coffee Bean" />
               </div>
+
+              {!editingLoc && (
+                <div className="space-y-2">
+                  <Label>اسم المستخدم لحساب صاحب المكان <span className="text-neutral-400 text-xs">(اختياري - إن لم يكتب سيتم توليده تلقائياً)</span></Label>
+                  <Input value={ownerUsername} onChange={e => setOwnerUsername(e.target.value)} placeholder="مثال: coffebean" dir="ltr" />
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label>رابط جوجل ماب (اختياري)</Label>

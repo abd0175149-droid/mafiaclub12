@@ -233,8 +233,8 @@ export default function UserManagementTab({ users, fetchAll }: { users: StaffMem
                   </TableCell>
                   <TableCell dir="ltr" className="text-right">{u.username}</TableCell>
                   <TableCell className="text-center">
-                    <Badge variant="outline" className={u.role === 'admin' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-blue-50 text-blue-700 border-blue-200'}>
-                      {u.role === 'admin' ? 'مسؤول (Admin)' : 'مدير (Manager)'}
+                    <Badge variant="outline" className={u.role === 'admin' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : u.role === 'location_owner' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-blue-50 text-blue-700 border-blue-200'}>
+                      {u.role === 'admin' ? 'مسؤول (Admin)' : u.role === 'location_owner' ? 'صاحب مكان' : 'مدير (Manager)'}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-center">{u.createdAt ? format(safeDate(u.createdAt)!, 'yyyy/MM/dd') : '-'}</TableCell>

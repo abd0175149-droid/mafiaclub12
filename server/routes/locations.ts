@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import db, { logAudit } from '../database.js';
+import bcrypt from 'bcryptjs';
+import db, { logAudit, generateUsername } from '../database.js';
 import { requireAuth, requirePermission, type AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
@@ -20,7 +21,7 @@ router.get('/', requireAuth, (req, res) => {
 
 // POST /api/locations
 router.post('/', requireAuth, requirePermission('locations'), (req: AuthRequest, res) => {
-  const { name, mapUrl, offers } = req.body;
+  const { name, mapUrl, offers, ownerUsername } = req.body;
   if (!name) return res.status(400).json({ error: 'Name is required' });
 
   const offersStr = JSON.stringify(Array.isArray(offers) ? offers : []);
@@ -29,14 +30,32 @@ router.post('/', requireAuth, requirePermission('locations'), (req: AuthRequest,
     name, mapUrl || '', offersStr
   );
 
+  const locationId = Number(info.lastInsertRowid);
+
+  // Auto-create location_owner account
+  let finalUsername = ownerUsername?.trim() || generateUsername(name);
+  // Ensure unique
+  const existingUser = db.prepare('SELECT id FROM staff WHERE username = ?').get(finalUsername);
+  if (existingUser) finalUsername = finalUsername + locationId;
+  
+  const password = finalUsername + '123';
+  const hash = bcrypt.hashSync(password, 10);
+  const staffResult = db.prepare(
+    'INSERT INTO staff (username, password, displayName, role, locationId, permissions) VALUES (?, ?, ?, ?, ?, ?)'
+  ).run(finalUsername, hash, name, 'location_owner', locationId, '[]');
+  db.prepare('INSERT OR IGNORE INTO user_settings (userId) VALUES (?)').run(staffResult.lastInsertRowid);
+
   const admins = db.prepare('SELECT id FROM staff WHERE role = ?').all('admin') as any[];
   const notifyStmt = db.prepare('INSERT INTO notifications (userId, title, message, type, targetId) VALUES (?, ?, ?, ?, ?)');
   for (const admin of admins) {
-    notifyStmt.run(admin.id, 'مكان جديد', `تم إضافة مكان فعالية جديد: ${name}`, 'new_location', 'location-' + info.lastInsertRowid.toString());
+    notifyStmt.run(admin.id, 'مكان جديد', `تم إضافة مكان فعالية جديد: ${name}`, 'new_location', 'location-' + locationId.toString());
   }
 
-  logAudit(req.user!.id, 'CREATE', 'locations', Number(info.lastInsertRowid));
-  res.status(201).json({ id: Number(info.lastInsertRowid), name, mapUrl, offers: JSON.parse(offersStr) });
+  logAudit(req.user!.id, 'CREATE', 'locations', locationId);
+  res.status(201).json({ 
+    id: locationId, name, mapUrl, offers: JSON.parse(offersStr),
+    ownerAccount: { username: finalUsername, password }
+  });
 });
 
 // PUT /api/locations/:id

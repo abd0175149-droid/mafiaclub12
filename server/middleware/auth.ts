@@ -8,9 +8,10 @@ export interface AuthUser {
   id: number;
   username: string;
   displayName: string;
-  role: 'admin' | 'manager';
+  role: 'admin' | 'manager' | 'location_owner';
   photoURL?: string | null;
   permissions?: string[];
+  locationId?: number | null;
 }
 
 export interface AuthRequest extends Request {
@@ -59,3 +60,12 @@ export function requirePermission(permission: string) {
     return res.status(403).json({ error: 'ليس لديك صلاحية الوصول' });
   };
 }
+
+// Middleware: block location_owner from admin-only routes
+export function requireNotLocationOwner(req: AuthRequest, res: Response, next: NextFunction) {
+  if (req.user?.role === 'location_owner') {
+    return res.status(403).json({ error: 'ليس لديك صلاحية الوصول لهذه الصفحة' });
+  }
+  next();
+}
+

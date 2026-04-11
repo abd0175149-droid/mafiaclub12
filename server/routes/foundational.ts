@@ -5,7 +5,9 @@ import { type AuthRequest, requireAuth, requirePermission, requireAdmin } from '
 const router = Router();
 
 // GET /api/foundational
-router.get('/', requireAuth, (_req, res) => {
+router.get('/', requireAuth, (req: AuthRequest, res) => {
+  // location_owner sees no foundational costs
+  if (req.user?.role === 'location_owner') return res.json([]);
   const rows = db.prepare('SELECT * FROM foundational_costs ORDER BY date DESC').all();
   res.json(rows);
 });

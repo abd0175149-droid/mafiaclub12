@@ -5,7 +5,9 @@ import { type AuthRequest, requireAuth, requirePermission } from '../middleware/
 const router = Router();
 
 // GET /api/costs
-router.get('/', requireAuth, (_req, res) => {
+router.get('/', requireAuth, (req: AuthRequest, res) => {
+  // location_owner sees no costs (revenue-only view)
+  if (req.user?.role === 'location_owner') return res.json([]);
   const rows = db.prepare('SELECT * FROM costs ORDER BY date DESC').all();
   res.json(rows);
 });

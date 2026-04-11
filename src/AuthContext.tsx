@@ -5,7 +5,8 @@ interface UserProfile {
   id: number;
   username: string;
   displayName: string;
-  role: 'admin' | 'manager';
+  role: 'admin' | 'manager' | 'location_owner';
+  locationId?: number | null;
 }
 
 interface AuthContextType {

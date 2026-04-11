@@ -5,7 +5,11 @@ import { type AuthRequest, requireAuth, requirePermission, requireAdmin } from '
 const router = Router();
 
 // GET /api/activities
-router.get('/', requireAuth, (_req, res) => {
+router.get('/', requireAuth, (req: AuthRequest, res) => {
+  if (req.user?.role === 'location_owner' && req.user.locationId) {
+    const rows = db.prepare('SELECT * FROM activities WHERE locationId = ? ORDER BY date DESC').all(req.user.locationId);
+    return res.json(rows);
+  }
   const rows = db.prepare('SELECT * FROM activities ORDER BY date DESC').all();
   res.json(rows);
 });

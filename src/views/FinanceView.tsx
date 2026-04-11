@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Activity, Booking, Cost, FoundationalCost, StaffMember } from '../types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,7 +7,7 @@ import { PaginationControls, usePagination } from '@/components/Pagination';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Trash2, DollarSign, Plus, ArrowLeftRight, Building2 } from 'lucide-react';
+import { Trash2, DollarSign, Plus, ArrowLeftRight, Building2, Filter } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAuth } from '../AuthContext';
 import { apiPost, apiDelete, apiPut } from '../lib/api';
@@ -26,6 +26,7 @@ interface FinanceViewProps {
 export default function FinanceView({ activities, bookings, costs, foundationalCosts, fetchData, staff }: FinanceViewProps) {
   const { profile } = useAuth();
   const isAdmin = profile?.role === 'admin';
+  const isLocationOwner = profile?.role === 'location_owner';
   const [activeTab, setActiveTab] = useState<'transactions' | 'foundational'>('transactions');
 
   // Transactions State
@@ -41,6 +42,12 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
   const [fPaidBy, setFPaidBy] = useState('');
   const [fSource, setFSource] = useState('');
   const [isAddingF, setIsAddingF] = useState(false);
+
+  // --- Filter State (for all users) ---
+  const [filterType, setFilterType] = useState<'all' | 'revenue' | 'expense'>('all');
+  const [filterReference, setFilterReference] = useState<string>('all');
+  const [filterDateFrom, setFilterDateFrom] = useState('');
+  const [filterDateTo, setFilterDateTo] = useState('');
 
   // Handlers
   const handleAddCost = async (e: React.FormEvent) => {
@@ -132,7 +139,6 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
     });
   };
 
-  const totalCosts = costs.reduce((s, c) => s + c.amount, 0);
   const totalFoundational = foundationalCosts.reduce((s, c) => s + c.amount, 0);
 
   // Compile Transactions
@@ -141,14 +147,49 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
     amount: b.paidAmount, type: 'revenue' as const, reference: activities.find(a => a.id === b.activityId)?.name || 'غير معروف',
     rawId: b.id
   }));
-  const expenses = costs.map(c => ({
+  const expenses = isLocationOwner ? [] : costs.map(c => ({
     id: `exp-${c.id}`, date: c.date, description: c.item,
     amount: c.amount, type: 'expense' as const, reference: c.type === 'activity' ? activities.find(a => a.id === c.activityId)?.name : 'تكاليف عامة',
     rawId: c.id
   }));
-  const transactions = [...revenues, ...expenses].sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+  const allTransactions = [...revenues, ...expenses].sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
 
-  const transactionsPagination = usePagination(transactions, 10);
+  // --- Apply Filters ---
+  const filteredTransactions = useMemo(() => {
+    let result = allTransactions;
+
+    // Filter by type
+    if (filterType !== 'all') {
+      result = result.filter(t => t.type === filterType);
+    }
+
+    // Filter by reference (activity name)
+    if (filterReference !== 'all') {
+      result = result.filter(t => t.reference === filterReference);
+    }
+
+    // Filter by date range
+    if (filterDateFrom) {
+      const from = new Date(filterDateFrom);
+      from.setHours(0, 0, 0, 0);
+      result = result.filter(t => t.date && new Date(t.date) >= from);
+    }
+    if (filterDateTo) {
+      const to = new Date(filterDateTo);
+      to.setHours(23, 59, 59, 999);
+      result = result.filter(t => t.date && new Date(t.date) <= to);
+    }
+
+    return result;
+  }, [allTransactions, filterType, filterReference, filterDateFrom, filterDateTo]);
+
+  // Unique references for filter dropdown
+  const uniqueReferences = useMemo(() => {
+    const refs = new Set(allTransactions.map(t => t.reference).filter(Boolean));
+    return Array.from(refs);
+  }, [allTransactions]);
+
+  const transactionsPagination = usePagination(filteredTransactions, 10);
   const foundationalPagination = usePagination(foundationalCosts, 10);
 
   return (
@@ -161,15 +202,17 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
           className={`flex items-center gap-3 p-4 rounded-xl text-right transition-all font-bold ${activeTab === 'transactions' ? 'bg-neutral-900 text-white shadow-lg' : 'bg-white hover:bg-neutral-100 text-neutral-600'}`}
         >
           <ArrowLeftRight className="w-5 h-5 flex-shrink-0" />
-          <span>المالية والحركات</span>
+          <span>{isLocationOwner ? 'الإيرادات' : 'المالية والحركات'}</span>
         </button>
-        <button 
-          onClick={() => setActiveTab('foundational')}
-          className={`flex items-center gap-3 p-4 rounded-xl text-right transition-all font-bold ${activeTab === 'foundational' ? 'bg-neutral-900 text-white shadow-lg' : 'bg-white hover:bg-neutral-100 text-neutral-600'}`}
-        >
-          <Building2 className="w-5 h-5 flex-shrink-0" />
-          <span>مصاريف التأسيس</span>
-        </button>
+        {!isLocationOwner && (
+          <button 
+            onClick={() => setActiveTab('foundational')}
+            className={`flex items-center gap-3 p-4 rounded-xl text-right transition-all font-bold ${activeTab === 'foundational' ? 'bg-neutral-900 text-white shadow-lg' : 'bg-white hover:bg-neutral-100 text-neutral-600'}`}
+          >
+            <Building2 className="w-5 h-5 flex-shrink-0" />
+            <span>مصاريف التأسيس</span>
+          </button>
+        )}
       </div>
 
       <div className="flex-1 overflow-auto bg-white rounded-xl shadow-sm border border-neutral-100 p-6">
@@ -178,22 +221,49 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
         {activeTab === 'transactions' && (
           <div className="space-y-6">
             <div className="flex items-center justify-between border-b pb-4">
-              <h2 className="text-xl font-bold flex items-center gap-2"><DollarSign className="text-emerald-500" /> الحركات المالية وتكاليف الأنشطة</h2>
+              <h2 className="text-xl font-bold flex items-center gap-2"><DollarSign className="text-emerald-500" /> {isLocationOwner ? 'إيرادات المكان' : 'الحركات المالية وتكاليف الأنشطة'}</h2>
             </div>
             
-            <form onSubmit={handleAddCost} className="grid grid-cols-1 md:grid-cols-5 gap-4 bg-neutral-50 p-4 rounded-xl border border-neutral-100">
-              <Input placeholder="وصف التكلفة..." value={costItem} onChange={e => setCostItem(e.target.value)} required className="bg-white" />
-              <Input type="number" placeholder="المبلغ (د.أ)" value={costAmount} onChange={e => setCostAmount(e.target.value)} required className="bg-white" />
-              <Input placeholder="دفع بواسطة (اختياري)" value={costPaidBy} onChange={e => setCostPaidBy(e.target.value)} className="bg-white" />
-              <Select value={costActivityId} onValueChange={setCostActivityId}>
-                 <SelectTrigger className="bg-white"><SelectValue placeholder="ارتباط بتكلفة" /></SelectTrigger>
-                 <SelectContent>
-                   <SelectItem value="general">تكاليف عامة</SelectItem>
-                   {activities.map(a => <SelectItem key={a.id} value={a.id.toString()}>{a.name}</SelectItem>)}
-                 </SelectContent>
+            {/* Add Cost Form (hidden for location_owner) */}
+            {!isLocationOwner && (
+              <form onSubmit={handleAddCost} className="grid grid-cols-1 md:grid-cols-5 gap-4 bg-neutral-50 p-4 rounded-xl border border-neutral-100">
+                <Input placeholder="وصف التكلفة..." value={costItem} onChange={e => setCostItem(e.target.value)} required className="bg-white" />
+                <Input type="number" placeholder="المبلغ (د.أ)" value={costAmount} onChange={e => setCostAmount(e.target.value)} required className="bg-white" />
+                <Input placeholder="دفع بواسطة (اختياري)" value={costPaidBy} onChange={e => setCostPaidBy(e.target.value)} className="bg-white" />
+                <Select value={costActivityId} onValueChange={setCostActivityId}>
+                   <SelectTrigger className="bg-white"><SelectValue placeholder="ارتباط بتكلفة" /></SelectTrigger>
+                   <SelectContent>
+                     <SelectItem value="general">تكاليف عامة</SelectItem>
+                     {activities.map(a => <SelectItem key={a.id} value={a.id.toString()}>{a.name}</SelectItem>)}
+                   </SelectContent>
+                </Select>
+                <Button type="submit" disabled={isAddingCost} className="bg-neutral-900 text-white"><Plus className="w-4 h-4 ml-2" /> تسجيل</Button>
+              </form>
+            )}
+
+            {/* --- Filters Bar (for all users) --- */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-neutral-50 p-3 rounded-xl border border-neutral-100">
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-neutral-400 shrink-0" />
+                <Select value={filterType} onValueChange={(v) => setFilterType(v as any)}>
+                  <SelectTrigger className="bg-white h-9 text-xs"><SelectValue placeholder="النوع" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">الكل</SelectItem>
+                    <SelectItem value="revenue">إيرادات فقط</SelectItem>
+                    {!isLocationOwner && <SelectItem value="expense">مصروفات فقط</SelectItem>}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Select value={filterReference} onValueChange={setFilterReference}>
+                <SelectTrigger className="bg-white h-9 text-xs"><SelectValue placeholder="الارتباط" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">جميع الأنشطة</SelectItem>
+                  {uniqueReferences.map(ref => <SelectItem key={ref} value={ref!}>{ref}</SelectItem>)}
+                </SelectContent>
               </Select>
-              <Button type="submit" disabled={isAddingCost} className="bg-neutral-900 text-white"><Plus className="w-4 h-4 ml-2" /> تسجيل</Button>
-            </form>
+              <Input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} className="bg-white h-9 text-xs" placeholder="من تاريخ" />
+              <Input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} className="bg-white h-9 text-xs" placeholder="إلى تاريخ" />
+            </div>
 
             <div className="border rounded-lg max-h-[60vh] overflow-y-auto">
               <Table>
@@ -202,7 +272,7 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
                      <TableHead className="text-right">التاريخ</TableHead>
                      <TableHead className="text-right">البيان</TableHead>
                      <TableHead className="text-right">الارتباط</TableHead>
-                     <TableHead className="text-right">النوع</TableHead>
+                     {!isLocationOwner && <TableHead className="text-right">النوع</TableHead>}
                      <TableHead className="text-right">المبلغ</TableHead>
                      <TableHead></TableHead>
                   </TableRow>
@@ -213,7 +283,9 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
                        <TableCell className="text-xs text-neutral-500">{t.date ? format(new Date(t.date), 'dd/MM HH:mm') : '-'}</TableCell>
                        <TableCell className="font-bold">{t.description}</TableCell>
                        <TableCell><Badge variant="outline" className="bg-neutral-100">{t.reference}</Badge></TableCell>
-                       <TableCell>{t.type === 'revenue' ? <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none">إيراد</Badge> : <Badge className="bg-rose-100 text-rose-700 hover:bg-rose-100 border-none">صرف</Badge>}</TableCell>
+                       {!isLocationOwner && (
+                         <TableCell>{t.type === 'revenue' ? <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none">إيراد</Badge> : <Badge className="bg-rose-100 text-rose-700 hover:bg-rose-100 border-none">صرف</Badge>}</TableCell>
+                       )}
                        <TableCell className="font-bold">{t.amount} د.أ</TableCell>
                        <TableCell>
                          {isAdmin && t.type === 'expense' && (
@@ -224,7 +296,7 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
                        </TableCell>
                     </TableRow>
                   ))}
-                  {transactions.length === 0 && <TableRow><TableCell colSpan={6} className="text-center py-8 text-neutral-400">لا توجد حركات مسجلة</TableCell></TableRow>}
+                  {filteredTransactions.length === 0 && <TableRow><TableCell colSpan={6} className="text-center py-8 text-neutral-400">لا توجد حركات مسجلة</TableCell></TableRow>}
                 </TableBody>
               </Table>
             </div>
@@ -232,7 +304,7 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
               currentPage={transactionsPagination.currentPage}
               totalPages={transactionsPagination.totalPages}
               itemsPerPage={transactionsPagination.itemsPerPage}
-              totalItems={transactions.length}
+              totalItems={filteredTransactions.length}
               onPageChange={transactionsPagination.setCurrentPage}
               onItemsPerPageChange={transactionsPagination.setItemsPerPage}
               label="حركة"
@@ -240,8 +312,8 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
           </div>
         )}
 
-        {/* Foundational Tab */}
-        {activeTab === 'foundational' && (
+        {/* Foundational Tab (hidden for location_owner) */}
+        {activeTab === 'foundational' && !isLocationOwner && (
           <div className="space-y-6">
             <div className="flex items-center justify-between border-b pb-4">
               <h2 className="text-xl font-bold flex items-center gap-2"><Building2 className="text-blue-500" /> مصاريف التأسيس</h2>
@@ -325,3 +397,4 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
     </div>
   );
 }
+
