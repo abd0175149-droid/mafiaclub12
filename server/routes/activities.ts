@@ -49,10 +49,31 @@ router.put('/:id', requireAuth, requirePermission('activities'), (req: AuthReque
 });
 
 // DELETE /api/activities/:id (cascade: bookings + costs)
-router.delete('/:id', requireAuth, requirePermission('activities'), (req: AuthRequest, res) => {
+router.delete('/:id', requireAuth, requirePermission('activities'), async (req: AuthRequest, res) => {
   const { id } = req.params;
-  const existing = db.prepare('SELECT * FROM activities WHERE id = ?').get(id);
+  const existing = db.prepare('SELECT * FROM activities WHERE id = ?').get(id) as any;
   if (!existing) return res.status(404).json({ error: 'النشاط غير موجود' });
+
+  if (existing.driveLink && req.query.deleteDriveFolder === 'true') {
+    try {
+      const match = existing.driveLink.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+      const folderId = match ? match[1] : (existing.driveLink.match(/[?&]id=([a-zA-Z0-9_-]+)/)?.[1] || null);
+      
+      if (folderId) {
+        const { google } = await import('googleapis');
+        const path = await import('path');
+        const fs = await import('fs');
+        const SERVICE_ACCOUNT_FILE = path.resolve(process.cwd(), 'google-service-account.json');
+        if (fs.existsSync(SERVICE_ACCOUNT_FILE)) {
+          const auth = new google.auth.GoogleAuth({ keyFile: SERVICE_ACCOUNT_FILE, scopes: ['https://www.googleapis.com/auth/drive'] });
+          const drive = google.drive({ version: 'v3', auth });
+          await drive.files.delete({ fileId: folderId });
+        }
+      }
+    } catch (err: any) {
+      console.error('Failed to delete Drive folder:', err.message);
+    }
+  }
 
   // CASCADE is handled by SQLite foreign keys
   db.prepare('DELETE FROM activities WHERE id = ?').run(id);

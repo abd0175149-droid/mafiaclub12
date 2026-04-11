@@ -38,7 +38,7 @@ import {
   Plus, Users, DollarSign, Calendar as CalendarIcon, TrendingUp, TrendingDown,
   Trash2, Pencil, CheckCircle2, Clock, Bell, Settings as SettingsIcon,
   LayoutDashboard, AlertTriangle, Info, Check, PieChart as PieChartIcon,
-  Building2, User as UserIcon, LogOut, Shield, Key, Menu, X, Eye, EyeOff
+  Building2, User as UserIcon, LogOut, Shield, Key, Menu, X, Eye, EyeOff, Loader2
 } from 'lucide-react';
 import { format, isAfter, startOfDay } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from 'recharts';
@@ -216,6 +216,9 @@ export default function Dashboard() {
       title: 'هل تريد حذف هذا النشاط؟',
       text: `سيتم حذف "${activity.name}" وجميع الحجوزات والتكاليف المرتبطة.`,
       icon: 'warning',
+      input: 'checkbox',
+      inputValue: 0,
+      inputPlaceholder: 'حذف المجلد المرتبط في Google Drive أيضاً؟',
       showCancelButton: true,
       confirmButtonColor: '#ef4444',
       cancelButtonColor: '#6b7280',
@@ -225,7 +228,7 @@ export default function Dashboard() {
     });
     if (!result.isConfirmed) return;
     try {
-      await apiDelete(`/activities/${activity.id}`);
+      await apiDelete(`/activities/${activity.id}?deleteDriveFolder=${result.value ? 'true' : 'false'}`);
       Swal.fire({ title: 'تم الحذف!', text: `تم حذف "${activity.name}" بنجاح`, icon: 'success', timer: 1500, showConfirmButton: false });
       fetchAll();
     } catch (err: any) {
@@ -1180,8 +1183,12 @@ function BookingsTabContent({ bookings, activities, fetchAll, staff, profile }: 
 function ActivityForm({ locations, fetchAll }: { locations: Location[], fetchAll: () => void }) {
   const { profile } = useAuth();
   const [open, setOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     const formData = new FormData(e.currentTarget);
     try {
       const locationId = formData.get('locationId') as string;
@@ -1224,6 +1231,8 @@ function ActivityForm({ locations, fetchAll }: { locations: Location[], fetchAll
       fetchAll();
     } catch (err: any) {
       toast.error(err.message || 'حدث خطأ عند الحفظ');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -1265,7 +1274,13 @@ function ActivityForm({ locations, fetchAll }: { locations: Location[], fetchAll
             </Select>
           </div>
           <DialogFooter>
-            <Button type="submit" className="w-full">حفظ النشاط</Button>
+            <Button type="submit" className="w-full" disabled={isSubmitting}>
+              {isSubmitting ? (
+                 <span className="flex items-center gap-2">
+                   <Loader2 className="w-4 h-4 animate-spin" /> جاري التجهيز...
+                 </span>
+              ) : 'حفظ النشاط'}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
