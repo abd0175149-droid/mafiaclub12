@@ -78,21 +78,45 @@ export default function Dashboard() {
   const [locations, setLocations] = useState<Location[]>([]);
   const [activeTab, setActiveTab] = useState('overview');
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
+  const [editingActivityMain, setEditingActivityMain] = useState<Activity | null>(null);
   const [loading, setLoading] = useState(true);
 
   const isAdmin = profile?.role === 'admin';
 
   const fetchAll = useCallback(async () => {
     try {
-      const [act, book, cos, found, notif, sett, locs] = await Promise.all([
-        apiGet<Activity[]>('/activities'),
-        apiGet<Booking[]>('/bookings'),
-        apiGet<Cost[]>('/costs'),
-        apiGet<FoundationalCost[]>('/foundational'),
-        apiGet<Notification[]>('/notifications'),
-        apiGet<UserSettings>('/settings'),
-        apiGet<Location[]>('/locations').catch(() => []),
-      ]);
+      let act = await apiGet<Activity[]>('/activities');
+      const book = await apiGet<Booking[]>('/bookings');
+      const cos = await apiGet<Cost[]>('/costs');
+      const found = await apiGet<FoundationalCost[]>('/foundational');
+      const notif = await apiGet<Notification[]>('/notifications');
+      const sett = await apiGet<UserSettings>('/settings');
+      const locs = await apiGet<Location[]>('/locations').catch(() => []);
+
+      const now = new Date();
+      act = await Promise.all(act.map(async (a) => {
+        if (a.status === 'completed' || a.status === 'cancelled') return a;
+        const activityDate = safeDate(a.date);
+        if (!activityDate) return a;
+        
+        const nextDay = new Date(activityDate);
+        nextDay.setDate(nextDay.getDate() + 1);
+        nextDay.setHours(0,0,0,0);
+        
+        let newStatus: Activity['status'] = a.status;
+        if (now >= nextDay) newStatus = 'completed';
+        else if (now >= activityDate) newStatus = 'active';
+        else newStatus = 'planned';
+        
+        if (newStatus !== a.status) {
+          try {
+            await apiPut('/activities/' + a.id, { status: newStatus });
+            return { ...a, status: newStatus };
+          } catch(e) { console.error('Failed to auto-update activity status', e); }
+        }
+        return a;
+      }));
+
       setActivities(act); setBookings(book); setCosts(cos);
       setFoundationalCosts(found); setNotifications(notif); setSettings(sett);
       setLocations(locs || []);
@@ -263,7 +287,24 @@ export default function Dashboard() {
 
             {/* Desktop/Mobile User Controls */}
             <div className="flex items-center gap-3 dir-ltr">
-              <NotificationCenter notifications={notifications} />
+              <NotificationCenter notifications={notifications} onNotificationClick={(n) => {
+                if (n.type === 'new_booking') setActiveTab('bookings');
+                else if (n.type === 'financial' || n.type === 'cost_alert') setActiveTab('finances');
+                else if (n.type === 'new_location') setActiveTab('locations');
+                
+                if (n.targetId) {
+                  setTimeout(() => {
+                    const el = document.getElementById(`glow-${n.targetId}`);
+                    if (el) {
+                      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      el.classList.add('ring-4', 'ring-emerald-500', 'shadow-xl', 'shadow-emerald-500/30', 'transition-all', 'duration-500', 'scale-[1.02]');
+                      setTimeout(() => {
+                        el.classList.remove('ring-4', 'ring-emerald-500', 'shadow-xl', 'shadow-emerald-500/30', 'scale-[1.02]');
+                      }, 3000);
+                    }
+                  }, 600);
+                }
+              }} />
               <div className="h-6 w-px bg-neutral-200 mx-1"></div>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -396,7 +437,14 @@ export default function Dashboard() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {activities.length > 0 ? activities.map(activity => (
                   <div key={activity.id}>
-                    <ActivityCard activity={activity} stats={getActivityStats(activity.id)} onDelete={() => handleDeleteActivity(activity)} onStatusChange={fetchAll} onSelect={() => setSelectedActivity(activity)} />
+                    <ActivityCard 
+                      activity={activity} 
+                      stats={getActivityStats(activity.id)} 
+                      onDelete={() => handleDeleteActivity(activity)} 
+                      onStatusChange={fetchAll} 
+                      onSelect={() => setSelectedActivity(activity)} 
+                      onEdit={() => setEditingActivityMain(activity)}
+                    />
                   </div>
                 )) : (
                   <div className="col-span-full text-center py-16 text-neutral-400">
@@ -407,10 +455,72 @@ export default function Dashboard() {
                 )}
               </div>
             </div>
+            {/* Edit Activity Dialog */}
+            <Dialog open={!!editingActivityMain} onOpenChange={(o) => { if (!o) setEditingActivityMain(null); }}>
+              <DialogContent dir="rtl">
+                <DialogHeader>
+                  <DialogTitle>تعديل النشاط</DialogTitle>
+                </DialogHeader>
+                {editingActivityMain && (
+                  <form onSubmit={async (e) => {
+                    e.preventDefault();
+                    const formData = new FormData(e.currentTarget);
+                    try {
+                      const locationId = formData.get('locationId') as string;
+                      await apiPut('/activities/' + editingActivityMain.id, {
+                        name: formData.get('name') as string,
+                        date: new Date(formData.get('date') as string).toISOString(),
+                        description: formData.get('description'),
+                        basePrice: Number(formData.get('basePrice')),
+                        locationId: locationId && locationId !== 'none' ? Number(locationId) : null,
+                        driveLink: formData.get('driveLink')
+                      });
+                      setEditingActivityMain(null);
+                      toast.success('تم تحديث النشاط بنجاح');
+                      fetchAll();
+                    } catch (err: any) { toast.error(err.message || 'حدث خطأ عند التحديث'); }
+                  }} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>اسم النشاط</Label>
+                      <Input name="name" required defaultValue={editingActivityMain.name} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>التاريخ</Label>
+                      <Input name="date" type="datetime-local" required defaultValue={format(safeDate(editingActivityMain.date) || new Date(), "yyyy-MM-dd'T'HH:mm")} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>سعر التذكرة (د.أ)</Label>
+                      <Input name="basePrice" type="number" required defaultValue={editingActivityMain.basePrice} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>الوصف</Label>
+                      <Input name="description" defaultValue={editingActivityMain.description} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>موقع الفعالية</Label>
+                      <Select name="locationId" defaultValue={editingActivityMain.locationId?.toString() || "none"}>
+                        <SelectTrigger><SelectValue placeholder="اختر المكان..." /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">غير محدد</SelectItem>
+                          {locations.map(loc => <SelectItem key={loc.id} value={loc.id.toString()}>{loc.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>رابط التعاون Google Drive (اختياري)</Label>
+                      <Input name="driveLink" defaultValue={editingActivityMain.driveLink} dir="ltr" />
+                    </div>
+                    <DialogFooter>
+                      <Button type="submit" className="w-full">تحديث النشاط</Button>
+                    </DialogFooter>
+                  </form>
+                )}
+              </DialogContent>
+            </Dialog>
           </div>
 
           <div className={activeTab === 'bookings' ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
-            <BookingsTabContent bookings={bookings} activities={activities} fetchAll={fetchAll} staff={staff} />
+            <BookingsTabContent bookings={bookings} activities={activities} fetchAll={fetchAll} staff={staff} profile={profile} />
           </div>
 
           <div className={activeTab === 'finances' ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
@@ -490,11 +600,12 @@ function KPICard({ title, value, icon, subtitle, trend }: { title: string, value
   );
 }
 
-function NotificationCenter({ notifications }: { notifications: Notification[] }) {
+function NotificationCenter({ notifications, onNotificationClick }: { notifications: Notification[], onNotificationClick?: (n: Notification) => void }) {
   const unreadCount = notifications.filter(n => !n.read).length;
 
-  const markAsRead = async (id: string | number) => {
-    await apiPut('/notifications/' + id + '/read', {});
+  const markAsRead = async (n: Notification) => {
+    if (!n.read) await apiPut('/notifications/' + n.id + '/read', {});
+    if (onNotificationClick) onNotificationClick(n);
   };
 
   const markAllAsRead = async () => {
@@ -530,7 +641,7 @@ function NotificationCenter({ notifications }: { notifications: Notification[] }
             <div
               key={n.id}
               className={`p-4 border-b border-neutral-50 hover:bg-neutral-50 transition-colors cursor-pointer ${!n.read ? 'bg-blue-50/30' : ''}`}
-              onClick={() => markAsRead(n.id)}
+              onClick={() => markAsRead(n)}
             >
               <div className="flex gap-3">
                 <div className={`p-2 rounded-full h-fit ${n.type === 'cost_alert' ? 'bg-rose-100 text-rose-600' :
@@ -570,9 +681,10 @@ interface ActivityCardProps {
   onDelete?: () => void;
   onStatusChange?: () => void;
   onSelect?: () => void;
+  onEdit?: () => void;
 }
 
-const ActivityCard: React.FC<ActivityCardProps> = ({ activity, stats, onDelete, onStatusChange, onSelect }) => {
+const ActivityCard: React.FC<ActivityCardProps> = ({ activity, stats, onDelete, onStatusChange, onSelect, onEdit }) => {
   return (
     <Card className="border-none shadow-sm hover:shadow-md transition-shadow">
       <CardHeader className="pb-2">
@@ -618,12 +730,19 @@ const ActivityCard: React.FC<ActivityCardProps> = ({ activity, stats, onDelete, 
               <SelectItem value="cancelled">ملغي</SelectItem>
             </SelectContent>
           </Select>
-          <button type="button" title="عرض التفاصيل" className="inline-flex items-center justify-center text-blue-600 h-8 w-8 rounded-md hover:bg-blue-50 transition-colors" onClick={() => { console.log('[CARD] View details:', activity.id); if (onSelect) onSelect(); }}>
-            <Info className="w-4 h-4" />
-          </button>
-          <button type="button" title="حذف" className="inline-flex items-center justify-center text-rose-500 h-8 w-8 rounded-md hover:bg-rose-50 transition-colors" onClick={() => { console.log('[CARD] Delete clicked:', activity.id); if (onDelete) onDelete(); }}>
-            <Trash2 className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1">
+            {activity.status === 'planned' && (
+              <button type="button" title="تعديل النشاط" className="inline-flex items-center justify-center text-amber-500 h-8 w-8 rounded-md hover:bg-amber-50 transition-colors" onClick={() => { if (onEdit) onEdit(); }}>
+                <Pencil className="w-4 h-4" />
+              </button>
+            )}
+            <button type="button" title="عرض التفاصيل" className="inline-flex items-center justify-center text-blue-600 h-8 w-8 rounded-md hover:bg-blue-50 transition-colors" onClick={() => { console.log('[CARD] View details:', activity.id); if (onSelect) onSelect(); }}>
+              <Info className="w-4 h-4" />
+            </button>
+            <button type="button" title="حذف" className="inline-flex items-center justify-center text-rose-500 h-8 w-8 rounded-md hover:bg-rose-50 transition-colors" onClick={() => { console.log('[CARD] Delete clicked:', activity.id); if (onDelete) onDelete(); }}>
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -631,7 +750,7 @@ const ActivityCard: React.FC<ActivityCardProps> = ({ activity, stats, onDelete, 
 }
 
 // BookingsTabContent with search, filter, edit [BL-05, F-03, F-06, UX-02, UX-03]
-function BookingsTabContent({ bookings, activities, fetchAll, staff }: { bookings: Booking[], activities: Activity[], fetchAll: () => void, staff: StaffMember[] }) {
+function BookingsTabContent({ bookings, activities, fetchAll, staff, profile }: { bookings: Booking[], activities: Activity[], fetchAll: () => void, staff: StaffMember[], profile: any }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterActivity, setFilterActivity] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -662,8 +781,8 @@ function BookingsTabContent({ bookings, activities, fetchAll, staff }: { booking
         phone: fd.get('phone') as string,
         count: Number(fd.get('count')),
         paidAmount: Number(fd.get('paidAmount')),
-        receivedBy: fd.get('receivedBy') as string,
         notes: fd.get('notes') as string,
+        ...((!editingBooking.isPaid || !editingBooking.receivedBy || profile?.username === 'admin') && { receivedBy: fd.get('receivedBy') as string })
       });
       setEditingBooking(null);
       toast.success('تم تحديث الحجز بنجاح');
@@ -727,7 +846,7 @@ function BookingsTabContent({ bookings, activities, fetchAll, staff }: { booking
           </TableHeader>
           <TableBody>
             {filteredBookings.length > 0 ? filteredBookings.map(booking => (
-              <TableRow key={booking.id}>
+              <TableRow key={booking.id} id={'glow-booking-' + booking.id}>
                 <TableCell className="font-medium text-right">{booking.name}</TableCell>
                 <TableCell className="text-right">{activities.find(a => a.id === booking.activityId)?.name || 'غير معروف'}</TableCell>
                 <TableCell className="text-center">{booking.count}</TableCell>
@@ -842,7 +961,15 @@ function BookingsTabContent({ bookings, activities, fetchAll, staff }: { booking
               </div>
               <div className="space-y-2">
                 <Label>المستلم</Label>
-                <Input name="receivedBy" defaultValue={editingBooking.receivedBy || ''} />
+                <Input 
+                  name="receivedBy" 
+                  defaultValue={editingBooking.receivedBy || ''} 
+                  disabled={!!(editingBooking.isPaid && editingBooking.receivedBy && profile?.username !== 'admin')}
+                  className={!!(editingBooking.isPaid && editingBooking.receivedBy && profile?.username !== 'admin') ? 'bg-neutral-100 cursor-not-allowed opacity-70' : ''}
+                />
+                {!!(editingBooking.isPaid && editingBooking.receivedBy && profile?.username !== 'admin') && (
+                  <p className="text-[10px] text-amber-600 mt-1">لا يمكن تغيير اسم المستلم لحجز مدفوع. (صلاحية المدير العام فقط)</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label>ملاحظات</Label>

@@ -46,10 +46,11 @@ export interface Notification {
   id: string | number;
   title: string;
   message: string;
-  type: 'new_booking' | 'upcoming_activity' | 'cost_alert';
+  type: 'new_booking' | 'upcoming_activity' | 'cost_alert' | 'financial' | 'new_location';
   read: number;
   createdAt: string;
   userId: string | number;
+  targetId?: string;
 }
 
 export interface UserSettings {

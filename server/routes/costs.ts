@@ -19,6 +19,12 @@ router.post('/', requireAuth, requirePermission('finances'), (req: AuthRequest, 
     'INSERT INTO costs (activityId, item, amount, date, paidBy, type) VALUES (?,?,?,?,?,?)'
   ).run(activityId || null, item, amount, date, paidBy || '', type || 'general');
 
+  const admins = db.prepare('SELECT id FROM staff WHERE role = ?').all('admin') as any[];
+  const notifyStmt = db.prepare('INSERT INTO notifications (userId, title, message, type, targetId) VALUES (?, ?, ?, ?, ?)');
+  for (const admin of admins) {
+    notifyStmt.run(admin.id, 'مصروف جديد', `تم إضافة مصروف جديد: ${item}`, 'cost_alert', 'cost-' + result.lastInsertRowid.toString());
+  }
+
   logAudit(req.user!.id, 'create', 'costs', result.lastInsertRowid.toString());
   const cost = db.prepare('SELECT * FROM costs WHERE id = ?').get(result.lastInsertRowid);
   res.status(201).json(cost);

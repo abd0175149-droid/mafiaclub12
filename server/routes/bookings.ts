@@ -46,9 +46,9 @@ router.post('/', requireAuth, (req: AuthRequest, res) => {
 
   // Notify all admins
   const admins = db.prepare('SELECT id FROM staff WHERE role = ?').all('admin') as any[];
-  const notifyStmt = db.prepare('INSERT INTO notifications (userId, title, message, type) VALUES (?, ?, ?, ?)');
+  const notifyStmt = db.prepare('INSERT INTO notifications (userId, title, message, type, targetId) VALUES (?, ?, ?, ?, ?)');
   for (const admin of admins) {
-    notifyStmt.run(admin.id, 'حجز جديد', `حجز جديد باسم ${name}`, 'new_booking');
+    notifyStmt.run(admin.id, 'حجز جديد', `حجز جديد باسم ${name}`, 'new_booking', 'booking-' + result.lastInsertRowid.toString());
   }
 
   const booking = db.prepare('SELECT * FROM bookings WHERE id = ?').get(result.lastInsertRowid);
@@ -60,6 +60,9 @@ router.put('/:id', requireAuth, (req: AuthRequest, res) => {
   const { id } = req.params;
   const { name, phone, count, paidAmount, receivedBy, notes, isPaid, isFree } = req.body;
 
+  const existing = db.prepare('SELECT * FROM bookings WHERE id = ?').get(id) as any;
+  if (!existing) return res.status(404).json({ error: 'الحجز غير موجود' });
+
   db.prepare(
     `UPDATE bookings SET 
       name=COALESCE(?,name), phone=COALESCE(?,phone), count=COALESCE(?,count),
@@ -68,9 +71,16 @@ router.put('/:id', requireAuth, (req: AuthRequest, res) => {
     WHERE id=?`
   ).run(name, phone, count, paidAmount, receivedBy, notes, isPaid !== undefined ? (isPaid ? 1 : 0) : null, isFree !== undefined ? (isFree ? 1 : 0) : null, id);
 
+  if (isPaid === true && !existing.isPaid) {
+    const admins = db.prepare('SELECT id FROM staff WHERE role = ?').all('admin') as any[];
+    const notifyStmt = db.prepare('INSERT INTO notifications (userId, title, message, type, targetId) VALUES (?, ?, ?, ?, ?)');
+    for (const admin of admins) {
+      notifyStmt.run(admin.id, 'دفعة جديدة', `تم إستلام دفعة للحجز التابع لـ ${existing.name}`, 'financial', 'booking-' + id.toString());
+    }
+  }
+
   logAudit(req.user!.id, 'update', 'bookings', id, req.body);
   const booking = db.prepare('SELECT * FROM bookings WHERE id = ?').get(id);
-  if (!booking) return res.status(404).json({ error: 'الحجز غير موجود' });
   res.json(booking);
 });
 

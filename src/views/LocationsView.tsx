@@ -164,7 +164,7 @@ export default function LocationsView() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {locations.map(loc => (
-          <Card key={loc.id} className="border-none shadow-sm hover:shadow-md transition-all group">
+          <Card key={loc.id} id={'glow-location-' + loc.id} className="border-none shadow-sm hover:shadow-md transition-all group">
             <CardHeader className="pb-3 border-b border-neutral-100">
               <CardTitle className="text-lg flex justify-between items-center">
                 <span>{loc.name}</span>

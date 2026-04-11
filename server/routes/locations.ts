@@ -28,6 +28,13 @@ router.post('/', requireAuth, requirePermission('locations'), (req: AuthRequest,
   const info = db.prepare('INSERT INTO locations (name, mapUrl, offers) VALUES (?, ?, ?)').run(
     name, mapUrl || '', offersStr
   );
+
+  const admins = db.prepare('SELECT id FROM staff WHERE role = ?').all('admin') as any[];
+  const notifyStmt = db.prepare('INSERT INTO notifications (userId, title, message, type, targetId) VALUES (?, ?, ?, ?, ?)');
+  for (const admin of admins) {
+    notifyStmt.run(admin.id, 'مكان جديد', `تم إضافة مكان فعالية جديد: ${name}`, 'new_location', 'location-' + info.lastInsertRowid.toString());
+  }
+
   logAudit(req.user!.id, 'CREATE', 'locations', Number(info.lastInsertRowid));
   res.status(201).json({ id: Number(info.lastInsertRowid), name, mapUrl, offers: JSON.parse(offersStr) });
 });

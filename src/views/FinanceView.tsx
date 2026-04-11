@@ -100,7 +100,8 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
   // Compile Transactions
   const revenues = bookings.filter(b => b.isPaid).map(b => ({
     id: `rev-${b.id}`, date: b.createdAt, description: `حجز: ${b.name}`,
-    amount: b.paidAmount, type: 'revenue' as const, reference: activities.find(a => a.id === b.activityId)?.name || 'غير معروف'
+    amount: b.paidAmount, type: 'revenue' as const, reference: activities.find(a => a.id === b.activityId)?.name || 'غير معروف',
+    rawId: b.id
   }));
   const expenses = costs.map(c => ({
     id: `exp-${c.id}`, date: c.date, description: c.item,
@@ -167,7 +168,7 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
                 </TableHeader>
                 <TableBody>
                   {transactions.map(t => (
-                    <TableRow key={t.id}>
+                    <TableRow key={t.id} id={'glow-' + (t.type === 'revenue' ? `booking-${t.rawId}` : `cost-${t.rawId}`)}>
                        <TableCell className="text-xs text-neutral-500">{t.date ? format(new Date(t.date), 'dd/MM HH:mm') : '-'}</TableCell>
                        <TableCell className="font-bold">{t.description}</TableCell>
                        <TableCell><Badge variant="outline" className="bg-neutral-100">{t.reference}</Badge></TableCell>
