@@ -1189,8 +1189,25 @@ function ActivityForm({ locations, fetchAll }: { locations: Location[], fetchAll
       
       const locName = locations.find(l => l.id.toString() === locationId)?.name || 'نشاط خارجي';
       const d = new Date(dateStr);
-      const fDate = new Intl.DateTimeFormat('ar-EG', { day: 'numeric', month: 'long' }).format(d);
-      const generatedName = `${locName} ${fDate}`;
+      const fDateAr = new Intl.DateTimeFormat('ar-EG', { day: 'numeric', month: 'long' }).format(d);
+      const generatedName = `${locName} ${fDateAr}`;
+      
+      const fDateEn = new Intl.DateTimeFormat('en-US', { day: 'numeric', month: 'long', year: 'numeric' }).format(d);
+      const driveFolderName = `${locName} ${fDateEn}`;
+
+      let finalDriveLink = "";
+      try {
+        // إنشاء المجلد في الدرايف تلقائياً
+        const folderRes = await apiPost('/drive/folder', {
+          name: driveFolderName,
+          parentId: '1MLgq3qx0by7pi_MStkAofEiUYb4n33ml'
+        });
+        if (folderRes && folderRes.webViewLink) {
+          finalDriveLink = folderRes.webViewLink;
+        }
+      } catch (folderErr) {
+        console.error('Drive Folder Creation Error:', folderErr);
+      }
 
       await apiPost('/activities', {
         name: generatedName,
@@ -1199,7 +1216,7 @@ function ActivityForm({ locations, fetchAll }: { locations: Location[], fetchAll
         basePrice: Number(formData.get('basePrice')),
         status: 'planned',
         locationId: locationId && locationId !== 'none' ? Number(locationId) : null,
-        driveLink: formData.get('driveLink')
+        driveLink: finalDriveLink
       });
 
       setOpen(false);
@@ -1246,11 +1263,6 @@ function ActivityForm({ locations, fetchAll }: { locations: Location[], fetchAll
                 {locations.map(loc => <SelectItem key={loc.id} value={loc.id.toString()}>{loc.name}</SelectItem>)}
               </SelectContent>
             </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>رابط التعاون Google Drive (اختياري)</Label>
-            <Input name="driveLink" placeholder="يجب أن يكون Anyone with the link" dir="ltr" />
-            <p className="text-[10px] text-orange-500">ملاحظة: تأكد أن مجلد درايف مفتوح الصلاحية "Anyone with the link".</p>
           </div>
           <DialogFooter>
             <Button type="submit" className="w-full">حفظ النشاط</Button>
