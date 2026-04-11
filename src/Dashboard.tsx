@@ -410,7 +410,7 @@ export default function Dashboard() {
           </div>
 
           <div className={activeTab === 'bookings' ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
-            <BookingsTabContent bookings={bookings} activities={activities} fetchAll={fetchAll} />
+            <BookingsTabContent bookings={bookings} activities={activities} fetchAll={fetchAll} staff={staff} />
           </div>
 
           <div className={activeTab === 'finances' ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
@@ -631,7 +631,7 @@ const ActivityCard: React.FC<ActivityCardProps> = ({ activity, stats, onDelete, 
 }
 
 // BookingsTabContent with search, filter, edit [BL-05, F-03, F-06, UX-02, UX-03]
-function BookingsTabContent({ bookings, activities, fetchAll }: { bookings: Booking[], activities: Activity[], fetchAll: () => void }) {
+function BookingsTabContent({ bookings, activities, fetchAll, staff }: { bookings: Booking[], activities: Activity[], fetchAll: () => void, staff: StaffMember[] }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterActivity, setFilterActivity] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -666,7 +666,7 @@ function BookingsTabContent({ bookings, activities, fetchAll }: { bookings: Book
       });
       setEditingBooking(null);
       toast.success('تم تحديث الحجز بنجاح');
-      window.location.reload();
+      fetchAll();
     } catch (err: any) {
       toast.error(err.message || 'حدث خطأ أثناء تحديث الحجز');
     }
@@ -679,7 +679,7 @@ function BookingsTabContent({ bookings, activities, fetchAll }: { bookings: Book
           <CardTitle>سجل الحجوزات</CardTitle>
           <CardDescription>إدارة المشاركين وحالة الدفع — {filteredBookings.length} من {bookings.length}</CardDescription>
         </div>
-        <BookingForm activities={activities} />
+        <BookingForm activities={activities} staff={staff} fetchAll={fetchAll} />
       </CardHeader>
       <CardContent>
         {/* Search & Filters */}
@@ -712,25 +712,25 @@ function BookingsTabContent({ bookings, activities, fetchAll }: { bookings: Book
           </Select>
         </div>
 
-        <Table>
+        <Table dir="rtl">
           <TableHeader>
             <TableRow>
-              <TableHead>الاسم</TableHead>
-              <TableHead>النشاط</TableHead>
-              <TableHead>العدد</TableHead>
-              <TableHead>الحالة</TableHead>
-              <TableHead>المبلغ</TableHead>
-              <TableHead>المستلم</TableHead>
-              <TableHead>إجراءات</TableHead>
+              <TableHead className="text-right">الاسم</TableHead>
+              <TableHead className="text-right">النشاط</TableHead>
+              <TableHead className="text-center">العدد</TableHead>
+              <TableHead className="text-center">الحالة</TableHead>
+              <TableHead className="text-center">المبلغ</TableHead>
+              <TableHead className="text-right">المستلم</TableHead>
+              <TableHead className="text-center">إجراءات</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredBookings.length > 0 ? filteredBookings.map(booking => (
               <TableRow key={booking.id}>
-                <TableCell className="font-medium">{booking.name}</TableCell>
-                <TableCell>{activities.find(a => a.id === booking.activityId)?.name || 'غير معروف'}</TableCell>
-                <TableCell>{booking.count}</TableCell>
-                <TableCell>
+                <TableCell className="font-medium text-right">{booking.name}</TableCell>
+                <TableCell className="text-right">{activities.find(a => a.id === booking.activityId)?.name || 'غير معروف'}</TableCell>
+                <TableCell className="text-center">{booking.count}</TableCell>
+                <TableCell className="text-center">
                   {booking.isFree ? (
                     <Badge variant="secondary" className="bg-blue-50 text-blue-700 border-blue-200">مجاني</Badge>
                   ) : booking.isPaid ? (
@@ -739,8 +739,8 @@ function BookingsTabContent({ bookings, activities, fetchAll }: { bookings: Book
                     <Badge variant="secondary" className="bg-amber-50 text-amber-700 border-amber-200">لم يتم الدفع</Badge>
                   )}
                 </TableCell>
-                <TableCell>{booking.paidAmount} {CURRENCY}</TableCell>
-                <TableCell>{booking.receivedBy || '-'}</TableCell>
+                <TableCell className="text-center">{booking.paidAmount} {CURRENCY}</TableCell>
+                <TableCell className="text-right">{booking.receivedBy || '-'}</TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1">
                     <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditingBooking(booking)}>
@@ -750,20 +750,37 @@ function BookingsTabContent({ bookings, activities, fetchAll }: { bookings: Book
                       <Button size="sm" variant="outline" className="h-8 text-xs" onClick={async () => {
                         const basePrice = activities.find(a => a.id === booking.activityId)?.basePrice || 0;
                         const suggestedAmount = basePrice * booking.count;
-                        const { value: actualAmount } = await Swal.fire({
+                        const staffOptions = staff.reduce((acc: Record<string,string>, s) => { acc[s.id || s.displayName] = s.displayName; return acc; }, {});
+                        const { value: formValues } = await Swal.fire({
                           title: 'تأكيد الدفع',
-                          input: 'number',
-                          inputLabel: `المبلغ المقترح: ${suggestedAmount} ${CURRENCY}`,
-                          inputValue: suggestedAmount,
+                          html: `
+                            <div style="text-align:right;direction:rtl;">
+                              <label style="display:block;margin-bottom:4px;font-weight:600;font-size:14px;">المبلغ المدفوع</label>
+                              <input id="swal-amount" type="number" class="swal2-input" value="${suggestedAmount}" style="margin:0 0 12px 0;width:100%;text-align:right;" />
+                              <label style="display:block;margin-bottom:4px;font-weight:600;font-size:14px;">الموظف المستلم</label>
+                              <select id="swal-staff" class="swal2-select" style="margin:0;width:100%;text-align:right;">
+                                <option value="">اختر الموظف</option>
+                                ${staff.map(s => '<option value="' + s.displayName + '">' + s.displayName + '</option>').join('')}
+                              </select>
+                            </div>
+                          `,
                           showCancelButton: true,
                           confirmButtonText: 'تأكيد الدفع',
                           cancelButtonText: 'إلغاء',
                           confirmButtonColor: '#10b981',
-                          reverseButtons: true
+                          reverseButtons: true,
+                          focusConfirm: false,
+                          preConfirm: () => {
+                            const amount = (document.getElementById('swal-amount') as HTMLInputElement)?.value;
+                            const staffName = (document.getElementById('swal-staff') as HTMLSelectElement)?.value;
+                            if (!amount || Number(amount) <= 0) { Swal.showValidationMessage('أدخل مبلغ صحيح'); return false; }
+                            if (!staffName) { Swal.showValidationMessage('اختر الموظف المستلم'); return false; }
+                            return { amount: Number(amount), staffName };
+                          }
                         });
-                        if (actualAmount !== undefined) {
+                        if (formValues) {
                           try {
-                            await apiPut('/bookings/' + booking.id + '/pay', { paidAmount: Number(actualAmount) });
+                            await apiPut('/bookings/' + booking.id + '/pay', { paidAmount: formValues.amount, receivedBy: formValues.staffName });
                             Swal.fire({ title: 'تم!', text: 'تم تأكيد الدفع بنجاح', icon: 'success', timer: 1500, showConfirmButton: false });
                             fetchAll();
                           } catch (err: any) { Swal.fire({ title: 'خطأ', text: err.message, icon: 'error' }); }
@@ -921,7 +938,7 @@ function ActivityForm({ locations, fetchAll }: { locations: Location[], fetchAll
   );
 }
 
-function BookingForm({ activities }: { activities: Activity[] }) {
+function BookingForm({ activities, staff, fetchAll }: { activities: Activity[], staff: StaffMember[], fetchAll: () => void }) {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [isFree, setIsFree] = useState(false);
@@ -960,6 +977,7 @@ function BookingForm({ activities }: { activities: Activity[] }) {
 
       setOpen(false);
       toast.success('تم تسجيل الحجز بنجاح');
+      fetchAll();
     } catch (err) {
       handleFirestoreError(err, OperationType.CREATE, 'bookings');
     }
@@ -1040,8 +1058,15 @@ function BookingForm({ activities }: { activities: Activity[] }) {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label>المستلم</Label>
-                <Input name="receivedBy" placeholder="اسم الشخص الذي استلم المبلغ" />
+                <Label>الموظف المستلم</Label>
+                <Select name="receivedBy">
+                  <SelectTrigger>
+                    <SelectValue placeholder="اختر الموظف" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {staff.map(s => <SelectItem key={s.id || s.displayName} value={s.displayName}>{s.displayName}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
             </>
           )}
