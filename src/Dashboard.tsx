@@ -780,7 +780,7 @@ function BookingsTabContent({ bookings, activities, fetchAll, staff }: { booking
                         });
                         if (formValues) {
                           try {
-                            await apiPut('/bookings/' + booking.id + '/pay', { paidAmount: formValues.amount, receivedBy: formValues.staffName });
+                            await apiPut('/bookings/' + booking.id, { isPaid: true, paidAmount: formValues.amount, receivedBy: formValues.staffName });
                             Swal.fire({ title: 'تم!', text: 'تم تأكيد الدفع بنجاح', icon: 'success', timer: 1500, showConfirmButton: false });
                             fetchAll();
                           } catch (err: any) { Swal.fire({ title: 'خطأ', text: err.message, icon: 'error' }); }
