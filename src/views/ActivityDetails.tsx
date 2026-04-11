@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import { Activity, Booking, Cost, Location } from '../types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -54,6 +54,7 @@ const getEmbedUrl = (link?: string) => {
 function DriveFolderBrowser({ driveLink }: { driveLink?: string }) {
   const rootFolderId = extractFolderId(driveLink);
   const [folderStack, setFolderStack] = useState<{ id: string; label: string }[]>([]);
+  const [pasteUrl, setPasteUrl] = useState('');
   
   const currentFolderId = folderStack.length > 0 
     ? folderStack[folderStack.length - 1].id 
@@ -71,21 +72,15 @@ function DriveFolderBrowser({ driveLink }: { driveLink?: string }) {
     setFolderStack([]);
   };
 
-  // Handle pasting a subfolder URL
-  const handleNavigateToFolder = useCallback(() => {
-    const url = window.prompt('ألصق رابط المجلد الفرعي من Google Drive:');
+  // Navigate to folder from pasted URL
+  const handlePasteNavigate = (url: string) => {
     if (!url) return;
     const folderId = extractFolderId(url);
-    if (folderId) {
-      // Extract folder name from URL or use generic name
-      const folderName = 'مجلد فرعي';
-      setFolderStack(prev => [...prev, { id: folderId, label: folderName }]);
+    if (folderId && folderId !== currentFolderId) {
+      setFolderStack(prev => [...prev, { id: folderId, label: `مجلد ${prev.length + 1}` }]);
+      setPasteUrl('');
     }
-  }, []);
-
-  // Listen for popup/new tab attempts and intercept them
-  // We use sandbox to block popups, and provide manual navigation instead
-  const iframeRef = React.useRef<HTMLIFrameElement>(null);
+  };
 
   if (!driveLink || !embedUrl) {
     return (
@@ -102,68 +97,83 @@ function DriveFolderBrowser({ driveLink }: { driveLink?: string }) {
   return (
     <div className="absolute inset-0 flex flex-col">
       {/* Navigation toolbar */}
-      <div className="flex items-center gap-2 px-4 py-2 bg-white border-b border-neutral-100 shrink-0">
-        {/* Breadcrumb */}
-        <div className="flex items-center gap-1 flex-1 min-w-0 text-sm">
-          <button 
-            onClick={handleGoHome}
-            className={`flex items-center gap-1 px-2 py-1 rounded hover:bg-neutral-100 transition-colors shrink-0 ${folderStack.length === 0 ? 'text-neutral-900 font-bold' : 'text-blue-600'}`}
-          >
-            <Home className="w-3.5 h-3.5" />
-            <span>الرئيسي</span>
-          </button>
-          {folderStack.map((folder, i) => (
-            <React.Fragment key={i}>
-              <ChevronRight className="w-3 h-3 text-neutral-300 shrink-0 rotate-180" />
-              <button
-                onClick={() => setFolderStack(prev => prev.slice(0, i + 1))}
-                className={`px-2 py-1 rounded hover:bg-neutral-100 transition-colors truncate max-w-[120px] ${i === folderStack.length - 1 ? 'text-neutral-900 font-bold' : 'text-blue-600'}`}
-              >
-                {folder.label}
-              </button>
-            </React.Fragment>
-          ))}
-        </div>
+      <div className="flex flex-col gap-2 px-4 py-2 bg-white border-b border-neutral-100 shrink-0">
+        <div className="flex items-center gap-2">
+          {/* Breadcrumb */}
+          <div className="flex items-center gap-1 flex-1 min-w-0 text-sm">
+            <button 
+              onClick={handleGoHome}
+              className={`flex items-center gap-1 px-2 py-1 rounded hover:bg-neutral-100 transition-colors shrink-0 ${folderStack.length === 0 ? 'text-neutral-900 font-bold' : 'text-blue-600'}`}
+            >
+              <Home className="w-3.5 h-3.5" />
+              <span>الرئيسي</span>
+            </button>
+            {folderStack.map((folder, i) => (
+              <React.Fragment key={i}>
+                <ChevronRight className="w-3 h-3 text-neutral-300 shrink-0 rotate-180" />
+                <button
+                  onClick={() => setFolderStack(prev => prev.slice(0, i + 1))}
+                  className={`px-2 py-1 rounded hover:bg-neutral-100 transition-colors truncate max-w-[120px] ${i === folderStack.length - 1 ? 'text-neutral-900 font-bold' : 'text-blue-600'}`}
+                >
+                  {folder.label}
+                </button>
+              </React.Fragment>
+            ))}
+          </div>
 
-        {/* Action buttons */}
-        <div className="flex items-center gap-1 shrink-0">
-          {folderStack.length > 0 && (
-            <Button variant="ghost" size="sm" onClick={handleGoBack} className="h-7 text-xs gap-1">
-              <ArrowRight className="w-3 h-3" /> رجوع
-            </Button>
-          )}
-          <Button variant="ghost" size="sm" onClick={handleNavigateToFolder} className="h-7 text-xs gap-1">
-            <FolderOpen className="w-3 h-3" /> فتح مجلد
-          </Button>
-          <a 
-            href={`https://drive.google.com/drive/folders/${currentFolderId}`}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1 px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded transition-colors"
+          {/* Action buttons */}
+          <div className="flex items-center gap-1 shrink-0">
+            {folderStack.length > 0 && (
+              <Button variant="ghost" size="sm" onClick={handleGoBack} className="h-7 text-xs gap-1">
+                <ArrowRight className="w-3 h-3" /> رجوع
+              </Button>
+            )}
+            <a 
+              href={`https://drive.google.com/drive/folders/${currentFolderId}`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded transition-colors"
+            >
+              <ExternalLink className="w-3 h-3" /> فتح في Drive
+            </a>
+          </div>
+        </div>
+        
+        {/* URL Paste input - always visible */}
+        <div className="flex items-center gap-2">
+          <div className="flex-1 relative">
+            <input
+              type="text"
+              value={pasteUrl}
+              onChange={(e) => setPasteUrl(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handlePasteNavigate(pasteUrl); }}
+              placeholder="📂 لفتح مجلد فرعي: انقر بالزر الأيمن على المجلد → نسخ الرابط → الصقه هنا"
+              className="w-full h-8 px-3 text-xs border border-neutral-200 rounded-lg bg-neutral-50 focus:bg-white focus:border-blue-300 focus:ring-1 focus:ring-blue-200 outline-none transition-all placeholder:text-neutral-400"
+              dir="rtl"
+            />
+          </div>
+          <Button 
+            variant="default" 
+            size="sm" 
+            onClick={() => handlePasteNavigate(pasteUrl)}
+            disabled={!pasteUrl}
+            className="h-8 text-xs px-3 shrink-0"
           >
-            <ExternalLink className="w-3 h-3" /> Drive
-          </a>
+            <FolderOpen className="w-3 h-3 ml-1" /> انتقال
+          </Button>
         </div>
       </div>
 
-      {/* iframe - sandboxed to prevent popups, with message listener */}
+      {/* iframe */}
       <div className="flex-1 relative">
         <iframe 
-          ref={iframeRef}
-          key={currentFolderId} // Force re-mount on folder change
+          key={currentFolderId}
           src={embedUrl} 
           className="w-full h-full border-none absolute inset-0"
           sandbox="allow-scripts allow-same-origin allow-forms"
           allow="autoplay"
           title="Google Drive Activity Files"
         />
-        {/* Invisible overlay that detects clicks and shows navigation hint */}
-        <div 
-          className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-neutral-900/80 text-white text-xs px-4 py-2 rounded-full backdrop-blur-sm pointer-events-none opacity-0 transition-opacity duration-300"
-          id="drive-nav-hint"
-        >
-          💡 لفتح مجلد فرعي: انقر "فتح مجلد" وألصق رابطه
-        </div>
       </div>
     </div>
   );
