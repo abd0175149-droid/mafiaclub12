@@ -524,7 +524,7 @@ export default function Dashboard() {
           </div>
 
           <div className={activeTab === 'finances' ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
-            <FinanceView activities={activities} bookings={bookings} costs={costs} foundationalCosts={foundationalCosts} fetchData={fetchAll} />
+            <FinanceView activities={activities} bookings={bookings} costs={costs} foundationalCosts={foundationalCosts} fetchData={fetchAll} staff={staff} />
           </div>
 
           <div className={activeTab === 'locations' ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
@@ -1127,26 +1127,28 @@ function ActivityForm({ locations, fetchAll }: { locations: Location[], fetchAll
 }
 
 function BookingForm({ activities, staff, fetchAll }: { activities: Activity[], staff: StaffMember[], fetchAll: () => void }) {
-  const { user } = useAuth();
+  const { profile } = useAuth();
   const [open, setOpen] = useState(false);
   const [isFree, setIsFree] = useState(false);
 
   // Reset form state when dialog closes [UX-06]
   useEffect(() => { if (!open) setIsFree(false); }, [open]);
 
-  const availableActivities = activities.filter(a => a.status !== 'cancelled' && a.status !== 'completed');
+  const availableActivities = activities.filter(a => 
+    a.status !== 'cancelled' && 
+    (a.status !== 'completed' || profile?.username === 'admin')
+  );
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const activityId = formData.get('activityId') as string;
-    const activity = activities.find(a => a.id === activityId);
     const count = Number(formData.get('count'));
     const isPaid = formData.get('isPaid') === 'true';
     const name = formData.get('name') as string;
 
     try {
-      await addDoc(collection(db, 'bookings'), {
+      await apiPost('/bookings', {
         activityId,
         name,
         phone: formData.get('phone'),
@@ -1155,19 +1157,14 @@ function BookingForm({ activities, staff, fetchAll }: { activities: Activity[], 
         isPaid: isFree ? true : isPaid,
         paidAmount: isFree ? 0 : (isPaid ? Number(formData.get('paidAmount')) : 0),
         receivedBy: formData.get('receivedBy'),
-        notes: formData.get('notes'),
-        createdAt: Timestamp.now()
+        notes: formData.get('notes')
       });
-
-      if (user && activity) {
-        await notifyAllAdmins('حجز جديد', `تم تسجيل حجز جديد لـ ${name} في نشاط ${activity.name}`, 'new_booking', user.uid);
-      }
 
       setOpen(false);
       toast.success('تم تسجيل الحجز بنجاح');
       fetchAll();
-    } catch (err) {
-      handleFirestoreError(err, OperationType.CREATE, 'bookings');
+    } catch (err: any) {
+      toast.error(err.message || 'حدث خطأ غير متوقع');
     }
   };
 

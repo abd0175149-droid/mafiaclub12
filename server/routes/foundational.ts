@@ -35,3 +35,14 @@ router.delete('/:id', requireAuth, requirePermission('finances'), (req: AuthRequ
 });
 
 export default router;
+
+// PUT /api/foundational/:id/process
+router.put('/:id/process', requireAuth, requirePermission('finances'), (req: AuthRequest, res) => {
+  const { isProcessed } = req.body;
+  const existing = db.prepare('SELECT * FROM foundational_costs WHERE id = ?').get(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'التكلفة غير موجودة' });
+
+  db.prepare('UPDATE foundational_costs SET isProcessed = ? WHERE id = ?').run(isProcessed ? 1 : 0, req.params.id);
+  logAudit(req.user!.id, 'update', 'foundational_costs_process', req.params.id);
+  res.json({ success: true, isProcessed: isProcessed ? 1 : 0 });
+});

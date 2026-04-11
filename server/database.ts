@@ -111,6 +111,11 @@ try { db.exec('ALTER TABLE activities ADD COLUMN driveLink TEXT DEFAULT ""'); } 
 try { db.exec('ALTER TABLE staff ADD COLUMN photoURL TEXT DEFAULT NULL'); } catch (e) { /* Column already exists */ }
 try { db.exec('ALTER TABLE staff ADD COLUMN permissions TEXT DEFAULT \'["activities","bookings","finances","locations"]\''); } catch (e) { /* Column already exists */ }
 try { db.exec('ALTER TABLE staff ADD COLUMN lastLogin TEXT DEFAULT NULL'); } catch (e) { /* Column already exists */ }
+try { db.exec('ALTER TABLE staff ADD COLUMN isPartner INTEGER DEFAULT 0'); } catch (e) { /* Column already exists */ }
+
+// Safe migrations for foundational_costs
+try { db.exec('ALTER TABLE foundational_costs ADD COLUMN isProcessed INTEGER DEFAULT 0'); } catch (e) { /* Column already exists */ }
+
 // Safe migration for notifications
 try { db.exec('ALTER TABLE notifications ADD COLUMN targetId TEXT DEFAULT NULL'); } catch (e) { /* Column already exists */ }
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Activity, Booking, Cost, FoundationalCost } from '../types';
+import { Activity, Booking, Cost, FoundationalCost, StaffMember } from '../types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Trash2, DollarSign, Plus, ArrowLeftRight, Building2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAuth } from '../AuthContext';
-import { apiPost, apiDelete } from '../lib/api';
+import { apiPost, apiDelete, apiPut } from '../lib/api';
 import Swal from 'sweetalert2';
 import { toast } from 'sonner';
 
@@ -19,9 +19,10 @@ interface FinanceViewProps {
   costs: Cost[];
   foundationalCosts: FoundationalCost[];
   fetchData: () => void;
+  staff: StaffMember[];
 }
 
-export default function FinanceView({ activities, bookings, costs, foundationalCosts, fetchData }: FinanceViewProps) {
+export default function FinanceView({ activities, bookings, costs, foundationalCosts, fetchData, staff }: FinanceViewProps) {
   const { profile } = useAuth();
   const isAdmin = profile?.role === 'admin';
   const [activeTab, setActiveTab] = useState<'transactions' | 'foundational'>('transactions');
@@ -88,10 +89,45 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
     const r = await Swal.fire({ title: 'حذف التكلفة التأسيسية؟', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', cancelButtonColor: '#6b7280', confirmButtonText: 'احذف', cancelButtonText: 'إلغاء', reverseButtons: true });
     if (!r.isConfirmed) return;
     try {
-      await apiDelete(`/foundational/${id}`);
-      Swal.fire({ title: 'تم!', icon: 'success', timer: 1200, showConfirmButton: false });
-      fetchData();
     } catch (err: any) { Swal.fire({ title: 'خطأ', text: err.message, icon: 'error' }); }
+  };
+
+  const handleToggleProcessed = async (id: string | number, isProcessed: boolean) => {
+    try {
+      await apiPut(`/foundational/${id}/process`, { isProcessed });
+      toast.success('تم تحديث حالة المعالجة');
+      fetchData();
+    } catch (err: any) { toast.error(err.message || 'حدث خطأ'); }
+  };
+
+  const showPartnerStats = (personPaidBy: string) => {
+    if (!personPaidBy) return;
+    const partnerCount = Math.max(staff.filter(s => s.role === 'admin' || s.isPartner === 1 || s.isPartner === true).length, 1);
+    const grandTotal = foundationalCosts.reduce((s, c) => s + c.amount, 0);
+    if (grandTotal === 0) return;
+
+    const allProcessedTotal = foundationalCosts.filter(c => c.isProcessed === 1 || c.isProcessed === true).reduce((s, c) => s + c.amount, 0);
+    const personUnprocessed = foundationalCosts.filter(c => c.paidBy === personPaidBy && (!c.isProcessed || c.isProcessed === 0)).reduce((s, c) => s + c.amount, 0);
+    
+    const fraction = (personUnprocessed + (allProcessedTotal / partnerCount)) / grandTotal;
+    const percentage = (fraction * 100).toFixed(2);
+
+    Swal.fire({
+      title: 'إحصائيات المساهمة',
+      html: `
+        <div style="text-align:right; direction:rtl; line-height:2;">
+           <p><strong>الشريك:</strong> ${personPaidBy}</p>
+           <p><strong>إجمالي المبالغ غير المعالجة للشريك:</strong> <span style="color:red">${personUnprocessed} د.أ</span></p>
+           <p><strong>إجمالي المبالغ المعالجة للجميع:</strong> <span style="color:green">${allProcessedTotal} د.أ</span></p>
+           <p><strong>عدد الشركاء المعتمدين بالقسمة:</strong> ${partnerCount}</p>
+           <hr style="margin:10px 0"/>
+           <p><strong>إجمالي مصاريف التأسيس:</strong> ${grandTotal} د.أ</p>
+           <h3 style="margin-top:15px; color:#2563eb">نسبة المساهمة الحالية: %${percentage}</h3>
+        </div>
+      `,
+      confirmButtonText: 'إغلاق',
+      confirmButtonColor: '#0f172a'
+    });
   };
 
   const totalCosts = costs.reduce((s, c) => s + c.amount, 0);
@@ -216,6 +252,7 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
                      <TableHead className="text-right">البيان</TableHead>
                      <TableHead className="text-right">المبلغ</TableHead>
                      <TableHead className="text-right">معلومات الدفع</TableHead>
+                     <TableHead className="text-center">معالج؟</TableHead>
                      <TableHead></TableHead>
                    </TableRow>
                 </TableHeader>
@@ -226,7 +263,24 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
                       <TableCell className="font-bold">{cost.item}</TableCell>
                       <TableCell className="text-rose-600 font-bold">{cost.amount} د.أ</TableCell>
                       <TableCell className="text-xs">
-                        <div className="text-neutral-500 flex gap-2"><span className="text-neutral-900">{cost.paidBy}</span> {cost.source && `| ${cost.source}`}</div>
+                        <div 
+                           className="text-neutral-500 flex gap-2 cursor-pointer hover:text-blue-500 transition-colors"
+                           onClick={() => showPartnerStats(cost.paidBy)}
+                        >
+                           <span className="text-neutral-900 font-bold">{cost.paidBy}</span> {cost.source && `| ${cost.source}`}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                         <div className="flex items-center justify-center">
+                            <input 
+                              type="checkbox"
+                              checked={!!cost.isProcessed}
+                              onChange={(e) => handleToggleProcessed(cost.id, e.target.checked)}
+                              disabled={!(isAdmin || profile?.isPartner)}
+                              className="w-4 h-4 rounded border-neutral-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer disabled:opacity-50"
+                              title="تحديد أو إلغاء المعالجة"
+                            />
+                         </div>
                       </TableCell>
                       <TableCell>
                          {isAdmin && (
@@ -237,7 +291,7 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
                       </TableCell>
                     </TableRow>
                   ))}
-                  {foundationalCosts.length === 0 && <TableRow><TableCell colSpan={5} className="text-center py-8 text-neutral-400">لا توجد مصاريف تأسيس مسجلة</TableCell></TableRow>}
+                  {foundationalCosts.length === 0 && <TableRow><TableCell colSpan={6} className="text-center py-8 text-neutral-400">لا توجد مصاريف تأسيس مسجلة</TableCell></TableRow>}
                 </TableBody>
               </Table>
             </div>

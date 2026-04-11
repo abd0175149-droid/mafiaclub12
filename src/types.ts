@@ -69,6 +69,7 @@ export interface FoundationalCost {
   paidBy: string;
   source: string;
   date: string;
+  isProcessed?: number | boolean;
 }
 
 export interface StaffMember {
@@ -80,4 +81,5 @@ export interface StaffMember {
   permissions?: string[] | string;
   createdAt: string;
   lastLogin?: string | null;
+  isPartner?: number | boolean;
 }

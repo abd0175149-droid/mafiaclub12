@@ -39,9 +39,11 @@ export default function UserManagementTab({ users, fetchAll }: { users: StaffMem
   const [editRole, setEditRole] = useState<'admin' | 'manager'>('manager');
   const [editPerms, setEditPerms] = useState<string[]>([]);
   const [editPassword, setEditPassword] = useState('');
+  const [editIsPartner, setEditIsPartner] = useState(false);
   
   // Create state
   const [createPerms, setCreatePerms] = useState<string[]>(['activities', 'bookings', 'locations', 'finances']);
+  const [createIsPartner, setCreateIsPartner] = useState(false);
 
   const handleCreateUser = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -58,7 +60,8 @@ export default function UserManagementTab({ users, fetchAll }: { users: StaffMem
         password,
         displayName,
         role,
-        permissions: createPerms
+        permissions: createPerms,
+        isPartner: createIsPartner
       });
       toast.success('تم إضافة الموظف بنجاح');
       setOpen(false);
@@ -91,6 +94,7 @@ export default function UserManagementTab({ users, fetchAll }: { users: StaffMem
     } catch {
       setEditPerms([]);
     }
+    setEditIsPartner(!!user.isPartner);
     setEditPassword('');
     setEditOpen(true);
   };
@@ -101,7 +105,8 @@ export default function UserManagementTab({ users, fetchAll }: { users: StaffMem
       await apiPut(`/staff/${editingUser.id}`, {
         displayName: editName,
         role: editRole,
-        permissions: editPerms
+        permissions: editPerms,
+        isPartner: editIsPartner
       });
       // If password was provided, change it too
       if (editPassword && editPassword.length >= 4) {
@@ -166,6 +171,16 @@ export default function UserManagementTab({ users, fetchAll }: { users: StaffMem
                      </SelectContent>
                    </Select>
                  </div>
+              </div>
+              <div className="flex items-center space-x-2 space-x-reverse bg-neutral-50 p-2 rounded-lg border border-neutral-100">
+                <input 
+                  type="checkbox"
+                  id="c_isPartner" 
+                  checked={createIsPartner}
+                  onChange={(e) => setCreateIsPartner(e.target.checked)}
+                  className="w-4 h-4 rounded border-neutral-300 text-neutral-900 focus:ring-neutral-900"
+                />
+                <Label htmlFor="c_isPartner" className="cursor-pointer text-sm font-bold text-neutral-900">هذا المستخدم شريك بالمشروع</Label>
               </div>
               <div className="pt-4 border-t">
                 <Label className="block mb-3 font-bold text-neutral-900">الصلاحيات المخصصة للوصول:</Label>
@@ -266,6 +281,17 @@ export default function UserManagementTab({ users, fetchAll }: { users: StaffMem
                      </SelectContent>
                    </Select>
                  </div>
+              </div>
+
+              <div className="flex items-center space-x-2 space-x-reverse bg-neutral-50 p-2 rounded-lg border border-neutral-100">
+                <input 
+                  type="checkbox"
+                  id="e_isPartner" 
+                  checked={editIsPartner}
+                  onChange={(e) => setEditIsPartner(e.target.checked)}
+                  className="w-4 h-4 rounded border-neutral-300 text-neutral-900 focus:ring-neutral-900"
+                />
+                <Label htmlFor="e_isPartner" className="cursor-pointer text-sm font-bold text-neutral-900">هذا المستخدم شريك بالمشروع</Label>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
