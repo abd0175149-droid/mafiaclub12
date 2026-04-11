@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { Activity, Booking, Cost, Location } from '../types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { MapPin, ArrowRight, DollarSign, Users, Link as LinkIcon, Gift, Calendar, AlertTriangle } from 'lucide-react';
+import { MapPin, ArrowRight, DollarSign, Users, Link as LinkIcon, Gift, Calendar, AlertTriangle, FolderOpen, ChevronRight, Home, ExternalLink } from 'lucide-react';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 
@@ -21,6 +21,154 @@ const safeDate = (date: any) => {
   return new Date(date);
 };
 
+// Extract folder ID from any Google Drive folder URL
+const extractFolderId = (link?: string): string | null => {
+  if (!link) return null;
+  const match = link.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+  if (match) return match[1];
+  // Also check embeddedfolderview format
+  const embedMatch = link.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if (embedMatch) return embedMatch[1];
+  return null;
+};
+
+// Convert Google Drive links to embeddable URLs
+const getEmbedUrl = (link?: string) => {
+  if (!link) return null;
+  const folderMatch = link.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+  if (folderMatch) {
+    return 'https://drive.google.com/embeddedfolderview?id=' + folderMatch[1] + '#list';
+  }
+  const fileMatch = link.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (fileMatch) {
+    return 'https://drive.google.com/file/d/' + fileMatch[1] + '/preview';
+  }
+  const docsMatch = link.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  if (docsMatch && link.includes('docs.google.com')) {
+    return link.replace(/\/edit.*$/, '/preview');
+  }
+  return link;
+};
+
+// Drive Folder Browser Component
+function DriveFolderBrowser({ driveLink }: { driveLink?: string }) {
+  const rootFolderId = extractFolderId(driveLink);
+  const [folderStack, setFolderStack] = useState<{ id: string; label: string }[]>([]);
+  
+  const currentFolderId = folderStack.length > 0 
+    ? folderStack[folderStack.length - 1].id 
+    : rootFolderId;
+
+  const embedUrl = currentFolderId 
+    ? `https://drive.google.com/embeddedfolderview?id=${currentFolderId}#list`
+    : getEmbedUrl(driveLink);
+
+  const handleGoBack = () => {
+    setFolderStack(prev => prev.slice(0, -1));
+  };
+
+  const handleGoHome = () => {
+    setFolderStack([]);
+  };
+
+  // Handle pasting a subfolder URL
+  const handleNavigateToFolder = useCallback(() => {
+    const url = window.prompt('ألصق رابط المجلد الفرعي من Google Drive:');
+    if (!url) return;
+    const folderId = extractFolderId(url);
+    if (folderId) {
+      // Extract folder name from URL or use generic name
+      const folderName = 'مجلد فرعي';
+      setFolderStack(prev => [...prev, { id: folderId, label: folderName }]);
+    }
+  }, []);
+
+  // Listen for popup/new tab attempts and intercept them
+  // We use sandbox to block popups, and provide manual navigation instead
+  const iframeRef = React.useRef<HTMLIFrameElement>(null);
+
+  if (!driveLink || !embedUrl) {
+    return (
+      <div className="absolute inset-0 flex flex-col items-center justify-center text-neutral-400 p-8 text-center space-y-3">
+        <div className="w-16 h-16 bg-neutral-100 rounded-full flex items-center justify-center mb-2">
+          <AlertTriangle className="w-8 h-8 text-neutral-300" />
+        </div>
+        <p className="font-bold text-neutral-600">لم يتم إرفاق رابط Drive</p>
+        <p className="text-sm text-neutral-400 max-w-sm">قم بتعديل بيانات الفعالية وإضافة رابط مجلد Google Drive لتتمكن من معاينة الملفات هنا.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="absolute inset-0 flex flex-col">
+      {/* Navigation toolbar */}
+      <div className="flex items-center gap-2 px-4 py-2 bg-white border-b border-neutral-100 shrink-0">
+        {/* Breadcrumb */}
+        <div className="flex items-center gap-1 flex-1 min-w-0 text-sm">
+          <button 
+            onClick={handleGoHome}
+            className={`flex items-center gap-1 px-2 py-1 rounded hover:bg-neutral-100 transition-colors shrink-0 ${folderStack.length === 0 ? 'text-neutral-900 font-bold' : 'text-blue-600'}`}
+          >
+            <Home className="w-3.5 h-3.5" />
+            <span>الرئيسي</span>
+          </button>
+          {folderStack.map((folder, i) => (
+            <React.Fragment key={i}>
+              <ChevronRight className="w-3 h-3 text-neutral-300 shrink-0 rotate-180" />
+              <button
+                onClick={() => setFolderStack(prev => prev.slice(0, i + 1))}
+                className={`px-2 py-1 rounded hover:bg-neutral-100 transition-colors truncate max-w-[120px] ${i === folderStack.length - 1 ? 'text-neutral-900 font-bold' : 'text-blue-600'}`}
+              >
+                {folder.label}
+              </button>
+            </React.Fragment>
+          ))}
+        </div>
+
+        {/* Action buttons */}
+        <div className="flex items-center gap-1 shrink-0">
+          {folderStack.length > 0 && (
+            <Button variant="ghost" size="sm" onClick={handleGoBack} className="h-7 text-xs gap-1">
+              <ArrowRight className="w-3 h-3" /> رجوع
+            </Button>
+          )}
+          <Button variant="ghost" size="sm" onClick={handleNavigateToFolder} className="h-7 text-xs gap-1">
+            <FolderOpen className="w-3 h-3" /> فتح مجلد
+          </Button>
+          <a 
+            href={`https://drive.google.com/drive/folders/${currentFolderId}`}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded transition-colors"
+          >
+            <ExternalLink className="w-3 h-3" /> Drive
+          </a>
+        </div>
+      </div>
+
+      {/* iframe - sandboxed to prevent popups, with message listener */}
+      <div className="flex-1 relative">
+        <iframe 
+          ref={iframeRef}
+          key={currentFolderId} // Force re-mount on folder change
+          src={embedUrl} 
+          className="w-full h-full border-none absolute inset-0"
+          sandbox="allow-scripts allow-same-origin allow-forms"
+          allow="autoplay"
+          title="Google Drive Activity Files"
+        />
+        {/* Invisible overlay that detects clicks and shows navigation hint */}
+        <div 
+          className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-neutral-900/80 text-white text-xs px-4 py-2 rounded-full backdrop-blur-sm pointer-events-none opacity-0 transition-opacity duration-300"
+          id="drive-nav-hint"
+        >
+          💡 لفتح مجلد فرعي: انقر "فتح مجلد" وألصق رابطه
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ActivityDetails({ activity, location, bookings, costs, onBack }: ActivityDetailsProps) {
   const activityBookings = bookings.filter(b => b.activityId === activity.id);
   const activityCosts = costs.filter(c => c.activityId === activity.id);
@@ -30,30 +178,6 @@ export default function ActivityDetails({ activity, location, bookings, costs, o
   const profit = revenue - expense;
 
   const totalAttendees = activityBookings.reduce((sum, b) => sum + b.count, 0);
-
-  // Convert Google Drive links to embeddable URLs
-  const getEmbedUrl = (link?: string) => {
-    if (!link) return null;
-    // Handle folder links: https://drive.google.com/drive/folders/FOLDER_ID
-    const folderMatch = link.match(/\/folders\/([a-zA-Z0-9_-]+)/);
-    if (folderMatch) {
-      return 'https://drive.google.com/embeddedfolderview?id=' + folderMatch[1] + '#list';
-    }
-    // Handle file links: https://drive.google.com/file/d/FILE_ID/view
-    const fileMatch = link.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
-    if (fileMatch) {
-      return 'https://drive.google.com/file/d/' + fileMatch[1] + '/preview';
-    }
-    // Handle docs/sheets/slides
-    const docsMatch = link.match(/\/d\/([a-zA-Z0-9_-]+)/);
-    if (docsMatch && link.includes('docs.google.com')) {
-      return link.replace(/\/edit.*$/, '/preview');
-    }
-    // Fallback: if it's a drive link, return as-is
-    return link;
-  };
-
-  const driveEmbedUrl = getEmbedUrl(activity.driveLink);
 
   return (
     <div className="space-y-6 h-[calc(100vh-80px)] overflow-auto pb-10" dir="rtl">
@@ -154,32 +278,12 @@ export default function ActivityDetails({ activity, location, bookings, costs, o
         <div className="lg:col-span-2 h-[600px] md:h-auto flex flex-col">
           <Card className="border-none shadow-sm flex-1 flex flex-col overflow-hidden relative">
             <CardHeader className="border-b border-neutral-100 bg-white z-10 shrink-0 pb-4 pt-5 px-6">
-              <CardTitle className="text-lg flex justify-between items-center">
+              <CardTitle className="text-lg">
                 ملفات الفعالية (Google Drive)
-                {driveEmbedUrl && (
-                  <a href={driveEmbedUrl} target="_blank" rel="noreferrer" className="text-xs text-blue-600 font-normal hover:underline flex items-center gap-1">
-                    فتح في مستعرض جديد <LinkIcon className="w-3 h-3" />
-                  </a>
-                )}
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0 flex-1 relative bg-neutral-50">
-              {!driveEmbedUrl ? (
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-neutral-400 p-8 text-center space-y-3">
-                  <div className="w-16 h-16 bg-neutral-100 rounded-full flex items-center justify-center mb-2">
-                     <AlertTriangle className="w-8 h-8 text-neutral-300" />
-                  </div>
-                  <p className="font-bold text-neutral-600">لم يتم إرفاق رابط ड्राइव</p>
-                  <p className="text-sm text-neutral-400 max-w-sm">قم بتعديل بيانات الفعالية وإضافة رابط مجلد Google Drive (يجب أن يكون Anyone with link) لتتمكن من معاينة الملفات هنا.</p>
-                </div>
-              ) : (
-                <iframe 
-                  src={driveEmbedUrl} 
-                  className="w-full h-full border-none absolute inset-0"
-                  allow="autoplay"
-                  title="Google Drive Activity Files"
-                />
-              )}
+              <DriveFolderBrowser driveLink={activity.driveLink} />
             </CardContent>
           </Card>
         </div>
