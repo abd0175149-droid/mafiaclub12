@@ -438,6 +438,16 @@ export default function DriveFolderBrowser({ driveLink }: { driveLink?: string }
       {/* Lightbox / Previewer */}
       {viewportFile && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-neutral-900/95 backdrop-blur-md p-4">
+          {/* File info (Top Left) */}
+          <div className="absolute top-4 left-4 bg-black/60 text-white px-4 py-2 rounded-full text-sm backdrop-blur-md flex items-center gap-2 z-[110]">
+            <span className="max-w-[200px] sm:max-w-[300px] truncate">{viewportFile.name}</span>
+            {viewportFile.webViewLink && (
+              <a href={viewportFile.webViewLink} target="_blank" rel="noreferrer" className="text-blue-300 hover:text-white transition-colors" title="فتح الأصل" onClick={e => e.stopPropagation()}>
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            )}
+          </div>
+
           {/* Close */}
           <Button 
             variant="ghost" 
@@ -561,17 +571,6 @@ export default function DriveFolderBrowser({ driveLink }: { driveLink?: string }
                   )}
                 </div>
               </div>
-            )}
-            
-            {/* File info footer */}
-            <div className="absolute bottom-[-10px] bg-black/60 text-white px-4 py-2 rounded-full text-sm backdrop-blur-md flex items-center gap-2">
-               <span>{viewportFile.name}</span>
-               {viewportFile.webViewLink && (
-                 <a href={viewportFile.webViewLink} target="_blank" rel="noreferrer" className="text-blue-300 hover:text-white transition-colors" title="Открыть в Google Drive" onClick={e => e.stopPropagation()}>
-                    <ExternalLink className="w-3 h-3" />
-                 </a>
-               )}
-            </div>
           </div>
         </div>
       )}
