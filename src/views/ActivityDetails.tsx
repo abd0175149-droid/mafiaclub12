@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Activity, Booking, Cost, Location } from '../types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -57,21 +57,6 @@ export default function ActivityDetails({ activity, location, bookings, costs, o
   // Collapsible states
   const [bookingsOpen, setBookingsOpen] = useState(true);
   const [costsOpen, setCostsOpen] = useState(true);
-
-  // Dynamic Drive height = 2.5 × location card height
-  const locationRef = useRef<HTMLDivElement>(null);
-  const [driveHeight, setDriveHeight] = useState(600);
-
-  useEffect(() => {
-    if (!locationRef.current) return;
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        setDriveHeight(Math.max(entry.contentRect.height * 2.5, 400));
-      }
-    });
-    observer.observe(locationRef.current);
-    return () => observer.disconnect();
-  }, []);
 
   // Pie chart data
   const financialPieData = [
@@ -431,7 +416,7 @@ export default function ActivityDetails({ activity, location, bookings, costs, o
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* Location Card (measured for Drive height) */}
-        <div className="lg:col-span-1" ref={locationRef}>
+        <div className="lg:col-span-1">
           <Card className="border-none shadow-sm">
             <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center gap-2">
@@ -477,7 +462,7 @@ export default function ActivityDetails({ activity, location, bookings, costs, o
         </div>
 
         {/* Drive Embed (height = 2.5 × location card) */}
-        <div className="lg:col-span-2 flex flex-col" style={{ minHeight: `${driveHeight}px` }}>
+        <div className="lg:col-span-2 h-[700px] flex flex-col">
           <Card className="border-none shadow-sm flex-1 flex flex-col overflow-hidden relative">
             <CardHeader className="border-b border-neutral-100 bg-white z-10 shrink-0 pb-4 pt-5 px-6">
               <CardTitle className="text-lg">
