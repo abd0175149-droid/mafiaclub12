@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import { ArrowRight, AlertTriangle, FolderOpen, ChevronRight, Home, ExternalLink, File, Image as ImageIcon, Video as VideoIcon, Download, Loader2, X, Upload, Trash2, FolderPlus, Search, Edit2, Link as LinkIcon, MoreVertical, Copy, Share2, FileUp } from 'lucide-react';
+import { ArrowRight, AlertTriangle, FolderOpen, ChevronRight, ChevronLeft, Home, ExternalLink, File, Image as ImageIcon, Video as VideoIcon, Download, Loader2, X, Upload, Trash2, FolderPlus, Search, Edit2, Link as LinkIcon, MoreVertical, Copy, Share2, FileUp } from 'lucide-react';
 import { toast } from 'sonner';
 import Swal from 'sweetalert2';
 import { apiGet, apiDelete, apiPost, apiPut } from '../lib/api';
@@ -72,6 +72,26 @@ export default function DriveFolderBrowser({ driveLink }: { driveLink?: string }
       setViewportFile(file);
     }
   };
+
+  // Lightbox navigation
+  const previewableFiles = files.filter(f => f.mimeType !== 'application/vnd.google-apps.folder');
+  const currentPreviewIndex = viewportFile ? previewableFiles.findIndex(f => f.id === viewportFile.id) : -1;
+  const hasPrev = currentPreviewIndex > 0;
+  const hasNext = currentPreviewIndex < previewableFiles.length - 1;
+  const goToPrev = () => { if (hasPrev) setViewportFile(previewableFiles[currentPreviewIndex - 1]); };
+  const goToNext = () => { if (hasNext) setViewportFile(previewableFiles[currentPreviewIndex + 1]); };
+
+  // Keyboard navigation for lightbox
+  React.useEffect(() => {
+    if (!viewportFile) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') goToNext();
+      else if (e.key === 'ArrowRight') goToPrev();
+      else if (e.key === 'Escape') setViewportFile(null);
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [viewportFile, currentPreviewIndex]);
 
   const handleUploadClick = () => {
     setReplaceFileId(null);
@@ -368,6 +388,13 @@ export default function DriveFolderBrowser({ driveLink }: { driveLink?: string }
                         <DropdownMenuItem className="cursor-pointer gap-2" onClick={(e) => handleCopyLink(e as any, file.webViewLink)}>
                           <LinkIcon className="w-4 h-4" /> نسخ الرابط 
                         </DropdownMenuItem>
+                        {file.mimeType !== 'application/vnd.google-apps.folder' && (
+                          <DropdownMenuItem className="cursor-pointer gap-2" asChild>
+                            <a href={`/api/drive/file/${file.id}`} download onClick={(e) => e.stopPropagation()}>
+                              <Download className="w-4 h-4" /> تحميل الملف
+                            </a>
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem className="cursor-pointer gap-2" onClick={(e) => handleRename(e as any, file.id, file.name)}>
                           <Edit2 className="w-4 h-4" /> إعادة التسمية
                         </DropdownMenuItem>
@@ -411,6 +438,7 @@ export default function DriveFolderBrowser({ driveLink }: { driveLink?: string }
       {/* Lightbox / Previewer */}
       {viewportFile && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-neutral-900/95 backdrop-blur-md p-4">
+          {/* Close */}
           <Button 
             variant="ghost" 
             size="icon" 
@@ -420,11 +448,90 @@ export default function DriveFolderBrowser({ driveLink }: { driveLink?: string }
             <X className="w-8 h-8" />
           </Button>
 
+          {/* Counter */}
+          {previewableFiles.length > 1 && (
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-black/60 text-white px-4 py-1.5 rounded-full text-sm backdrop-blur-md z-[110]">
+              {currentPreviewIndex + 1} / {previewableFiles.length}
+            </div>
+          )}
+
+          {/* Prev Arrow */}
+          {hasPrev && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-white hover:bg-white/10 rounded-full z-[110] h-14 w-14"
+              onClick={goToPrev}
+            >
+              <ChevronRight className="w-8 h-8" />
+            </Button>
+          )}
+
+          {/* Next Arrow */}
+          {hasNext && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-white hover:bg-white/10 rounded-full z-[110] h-14 w-14"
+              onClick={goToNext}
+            >
+              <ChevronLeft className="w-8 h-8" />
+            </Button>
+          )}
+
           <div className="relative w-full h-full max-w-6xl max-h-[90vh] flex flex-col items-center justify-center animate-in fade-in zoom-in-95 duration-200">
             {viewportFile.mimeType.startsWith('image/') ? (
-              <img src={`/api/drive/file/${viewportFile.id}`} alt={viewportFile.name} className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" />
+              <>
+                <img src={`/api/drive/file/${viewportFile.id}`} alt={viewportFile.name} className="max-w-full max-h-[calc(100%-60px)] object-contain rounded-lg shadow-2xl" />
+                <div className="flex gap-2 mt-4">
+                  <a href={`/api/drive/file/${viewportFile.id}`} download>
+                    <Button className="gap-2 bg-white text-neutral-900 hover:bg-neutral-100 border border-neutral-200">
+                      <Download className="w-4 h-4" /> تحميل
+                    </Button>
+                  </a>
+                  {viewportFile.webViewLink && (
+                    <a href={viewportFile.webViewLink} target="_blank" rel="noreferrer">
+                      <Button variant="outline" className="gap-2 text-blue-400 border-blue-400/30 hover:bg-blue-950">
+                        <ExternalLink className="w-4 h-4" /> فتح الأصل
+                      </Button>
+                    </a>
+                  )}
+                  {viewportFile.webViewLink && (
+                    <Button
+                      variant="outline"
+                      className="gap-2 text-emerald-400 border-emerald-400/30 hover:bg-emerald-950"
+                      onClick={() => { navigator.clipboard.writeText(viewportFile.webViewLink); toast.success('تم نسخ رابط المشاركة'); }}
+                    >
+                      <Share2 className="w-4 h-4" /> مشاركة
+                    </Button>
+                  )}
+              </>
             ) : viewportFile.mimeType.startsWith('video/') ? (
-              <video src={`/api/drive/file/${viewportFile.id}`} controls autoPlay className="max-w-full max-h-full rounded-lg shadow-2xl bg-black" />
+              <>
+                <video src={`/api/drive/file/${viewportFile.id}`} controls autoPlay className="max-w-full max-h-[calc(100%-60px)] rounded-lg shadow-2xl bg-black" />
+                <div className="flex gap-2 mt-4">
+                  <a href={`/api/drive/file/${viewportFile.id}`} download>
+                    <Button className="gap-2 bg-white text-neutral-900 hover:bg-neutral-100 border border-neutral-200">
+                      <Download className="w-4 h-4" /> تحميل
+                    </Button>
+                  </a>
+                  {viewportFile.webViewLink && (
+                    <a href={viewportFile.webViewLink} target="_blank" rel="noreferrer">
+                      <Button variant="outline" className="gap-2 text-blue-400 border-blue-400/30 hover:bg-blue-950">
+                        <ExternalLink className="w-4 h-4" /> فتح الأصل
+                      </Button>
+                    </a>
+                  )}
+                  {viewportFile.webViewLink && (
+                    <Button
+                      variant="outline"
+                      className="gap-2 text-emerald-400 border-emerald-400/30 hover:bg-emerald-950"
+                      onClick={() => { navigator.clipboard.writeText(viewportFile.webViewLink); toast.success('تم نسخ رابط المشاركة'); }}
+                    >
+                      <Share2 className="w-4 h-4" /> مشاركة
+                    </Button>
+                  )}
+              </>
             ) : (
               <div className="bg-white p-8 rounded-xl text-center max-w-md w-full">
                 {renderIcon(viewportFile.mimeType)}
@@ -441,6 +548,15 @@ export default function DriveFolderBrowser({ driveLink }: { driveLink?: string }
                        <ExternalLink className="w-4 h-4" /> فتح الأصل
                     </Button>
                   </a>
+                  {viewportFile.webViewLink && (
+                    <Button
+                      variant="outline"
+                      className="flex-1 gap-2 text-emerald-600 border-emerald-200 hover:bg-emerald-50"
+                      onClick={() => { navigator.clipboard.writeText(viewportFile.webViewLink); toast.success('تم نسخ رابط المشاركة'); }}
+                    >
+                      <Share2 className="w-4 h-4" /> مشاركة
+                    </Button>
+                  )}
                 </div>
               </div>
             )}

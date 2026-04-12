@@ -55,8 +55,8 @@ export default function ActivityDetails({ activity, location, bookings, costs, o
   const unpaidAttendees = activityBookings.filter(b => !b.isPaid && !b.isFree).reduce((sum, b) => sum + b.count, 0);
 
   // Collapsible states
-  const [bookingsOpen, setBookingsOpen] = useState(true);
-  const [costsOpen, setCostsOpen] = useState(true);
+  const [bookingsOpen, setBookingsOpen] = useState(false);
+  const [costsOpen, setCostsOpen] = useState(false);
 
   // Pie chart data
   const financialPieData = [
