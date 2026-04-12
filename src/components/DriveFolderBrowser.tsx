@@ -505,6 +505,7 @@ export default function DriveFolderBrowser({ driveLink }: { driveLink?: string }
                       <Share2 className="w-4 h-4" /> مشاركة
                     </Button>
                   )}
+                </div>
               </>
             ) : viewportFile.mimeType.startsWith('video/') ? (
               <>
@@ -531,6 +532,7 @@ export default function DriveFolderBrowser({ driveLink }: { driveLink?: string }
                       <Share2 className="w-4 h-4" /> مشاركة
                     </Button>
                   )}
+                </div>
               </>
             ) : (
               <div className="bg-white p-8 rounded-xl text-center max-w-md w-full">
