@@ -458,7 +458,7 @@ export default function ActivityDetails({ activity, location, bookings, costs, o
         </div>
 
         {/* Drive Embed */}
-        <div className="lg:col-span-2 h-[1500px] md:h-auto flex flex-col">
+        <div className="lg:col-span-2 min-h-[1500px] flex flex-col">
           <Card className="border-none shadow-sm flex-1 flex flex-col overflow-hidden relative">
             <CardHeader className="border-b border-neutral-100 bg-white z-10 shrink-0 pb-4 pt-5 px-6">
               <CardTitle className="text-lg">
