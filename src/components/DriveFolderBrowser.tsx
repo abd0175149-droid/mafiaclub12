@@ -571,6 +571,7 @@ export default function DriveFolderBrowser({ driveLink }: { driveLink?: string }
                   )}
                 </div>
               </div>
+            )}
           </div>
         </div>
       )}
