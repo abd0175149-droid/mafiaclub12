@@ -1,14 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Activity, Booking, Cost, Location } from '../types';
-import { apiGet, apiDelete } from '../lib/api';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { MapPin, ArrowRight, DollarSign, Users, Link as LinkIcon, Gift, Calendar, AlertTriangle, FolderOpen, ChevronRight, Home, ExternalLink, File, Image as ImageIcon, Video as VideoIcon, Download, Loader2, X, Upload, Trash2, TrendingUp, TrendingDown, CreditCard, UserCheck, UserX, Ticket, Clock, Phone, StickyNote, Receipt } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { MapPin, ArrowRight, DollarSign, Users, Link as LinkIcon, Gift, Calendar, AlertTriangle, Ticket, ChevronDown, ChevronUp, Receipt, CreditCard, UserCheck } from 'lucide-react';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
-import { toast } from 'sonner';
-import Swal from 'sweetalert2';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 interface ActivityDetailsProps {
   activity: Activity;
@@ -56,363 +54,384 @@ export default function ActivityDetails({ activity, location, bookings, costs, o
   const freeAttendees = activityBookings.filter(b => b.isFree).reduce((sum, b) => sum + b.count, 0);
   const unpaidAttendees = activityBookings.filter(b => !b.isPaid && !b.isFree).reduce((sum, b) => sum + b.count, 0);
 
-  // Progress bar percentages
-  const paidPercent = totalAttendees > 0 ? (paidAttendees / totalAttendees) * 100 : 0;
-  const freePercent = totalAttendees > 0 ? (freeAttendees / totalAttendees) * 100 : 0;
-  const unpaidPercent = totalAttendees > 0 ? (unpaidAttendees / totalAttendees) * 100 : 0;
+  // Collapsible states
+  const [bookingsOpen, setBookingsOpen] = useState(true);
+  const [costsOpen, setCostsOpen] = useState(true);
+
+  // Dynamic Drive height = 2.5 × location card height
+  const locationRef = useRef<HTMLDivElement>(null);
+  const [driveHeight, setDriveHeight] = useState(600);
+
+  useEffect(() => {
+    if (!locationRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setDriveHeight(Math.max(entry.contentRect.height * 2.5, 400));
+      }
+    });
+    observer.observe(locationRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  // Pie chart data
+  const financialPieData = [
+    { name: 'الإيرادات', value: revenue, color: '#10b981' },
+    { name: 'التكاليف', value: expense, color: '#f43f5e' },
+  ].filter(d => d.value > 0);
+
+  const attendancePieData = [
+    { name: 'مدفوع', value: paidAttendees, color: '#10b981' },
+    { name: 'مجاني', value: freeAttendees, color: '#3b82f6' },
+    { name: 'غير مدفوع', value: unpaidAttendees, color: '#f59e0b' },
+  ].filter(d => d.value > 0);
 
   return (
     <div className="space-y-6 pb-10" dir="rtl">
       
-      {/* ===== SECTION 1: Enhanced Header ===== */}
-      <div className="pb-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="outline" size="icon" onClick={onBack} className="rounded-full h-10 w-10 shrink-0">
-              <ArrowRight className="w-5 h-5" />
-            </Button>
-            <div>
-              <div className="flex items-center gap-3 mb-1">
-                <h1 className="text-2xl font-bold text-neutral-900">{activity.name}</h1>
-                <Badge variant="outline" className={`${STATUS_COLORS[activity.status]} text-xs px-2.5 py-0.5`}>
-                  {STATUS_LABELS[activity.status]}
-                </Badge>
-              </div>
-              <div className="flex items-center gap-4 text-sm text-neutral-500">
+      {/* ===== HEADER ===== */}
+      <div className="pb-2">
+        <div className="flex items-center gap-4">
+          <Button variant="outline" size="icon" onClick={onBack} className="rounded-full h-10 w-10 shrink-0">
+            <ArrowRight className="w-5 h-5" />
+          </Button>
+          <div className="flex-1">
+            <div className="flex items-center gap-3 mb-1 flex-wrap">
+              <h1 className="text-2xl font-bold text-neutral-900">{activity.name}</h1>
+              <Badge variant="outline" className={`${STATUS_COLORS[activity.status]} text-xs px-2.5 py-0.5`}>
+                {STATUS_LABELS[activity.status]}
+              </Badge>
+            </div>
+            <div className="flex items-center gap-4 text-sm text-neutral-500 flex-wrap">
+              <span className="flex items-center gap-1.5">
+                <Calendar className="w-4 h-4" />
+                {format(safeDate(activity.date), 'dd MMMM yyyy - hh:mm a')}
+              </span>
+              <span className="flex items-center gap-1.5">
+                <Ticket className="w-4 h-4" />
+                {activity.basePrice} {CURRENCY} / شخص
+              </span>
+              {location && (
                 <span className="flex items-center gap-1.5">
-                  <Calendar className="w-4 h-4" />
-                  {format(safeDate(activity.date), 'dd MMMM yyyy - hh:mm a')}
+                  <MapPin className="w-4 h-4" />
+                  {location.name}
                 </span>
-                <span className="flex items-center gap-1.5">
-                  <Ticket className="w-4 h-4" />
-                  {activity.basePrice} {CURRENCY} / شخص
-                </span>
-                {location && (
-                  <span className="flex items-center gap-1.5">
-                    <MapPin className="w-4 h-4" />
-                    {location.name}
-                  </span>
-                )}
-              </div>
-              {activity.description && (
-                <p className="text-sm text-neutral-600 mt-2 max-w-2xl leading-relaxed">{activity.description}</p>
               )}
             </div>
+            {activity.description && (
+              <p className="text-sm text-neutral-600 mt-2 max-w-2xl leading-relaxed">{activity.description}</p>
+            )}
           </div>
         </div>
       </div>
 
-      {/* ===== SECTION 2: KPI Cards Row 1 (Financial) ===== */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {/* Net Profit */}
-        <Card className="border-none shadow-sm bg-gradient-to-br from-neutral-900 to-neutral-800 text-white">
-          <CardContent className="pt-5 pb-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-neutral-300 text-xs font-medium">صافي الربح</span>
-              <DollarSign className="w-4 h-4 text-emerald-400" />
-            </div>
-            <div className={`text-2xl font-bold ${profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-              {profit.toLocaleString()} {CURRENCY}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Revenue */}
+      {/* ===== PIE CHARTS (Financial + Attendance) ===== */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        {/* Financial Chart */}
         <Card className="border-none shadow-sm">
-          <CardContent className="pt-5 pb-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-neutral-500 text-xs font-medium">الإيرادات</span>
-              <TrendingUp className="w-4 h-4 text-emerald-500" />
-            </div>
-            <div className="text-2xl font-bold text-emerald-600">+{revenue.toLocaleString()} {CURRENCY}</div>
-          </CardContent>
-        </Card>
-
-        {/* Expenses */}
-        <Card className="border-none shadow-sm">
-          <CardContent className="pt-5 pb-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-neutral-500 text-xs font-medium">التكاليف</span>
-              <TrendingDown className="w-4 h-4 text-rose-500" />
-            </div>
-            <div className="text-2xl font-bold text-rose-600">-{expense.toLocaleString()} {CURRENCY}</div>
-          </CardContent>
-        </Card>
-
-        {/* Total Attendees */}
-        <Card className="border-none shadow-sm">
-          <CardContent className="pt-5 pb-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-neutral-500 text-xs font-medium">إجمالي الحضور</span>
-              <Users className="w-4 h-4 text-blue-500" />
-            </div>
-            <div className="text-2xl font-bold">{totalAttendees}</div>
-            <p className="text-xs text-neutral-400 mt-0.5">من {activityBookings.length} عملية حجز</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* ===== SECTION 2b: KPI Cards Row 2 (Attendance Breakdown) ===== */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {/* Base Price */}
-        <Card className="border-none shadow-sm">
-          <CardContent className="pt-5 pb-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-neutral-500 text-xs font-medium">سعر التذكرة</span>
-              <Ticket className="w-4 h-4 text-purple-500" />
-            </div>
-            <div className="text-2xl font-bold text-purple-600">{activity.basePrice} {CURRENCY}</div>
-          </CardContent>
-        </Card>
-
-        {/* Paid Attendees */}
-        <Card className="border-none shadow-sm">
-          <CardContent className="pt-5 pb-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-neutral-500 text-xs font-medium">حضور مدفوع</span>
-              <UserCheck className="w-4 h-4 text-emerald-500" />
-            </div>
-            <div className="text-2xl font-bold text-emerald-600">{paidAttendees}</div>
-          </CardContent>
-        </Card>
-
-        {/* Free Attendees */}
-        <Card className="border-none shadow-sm">
-          <CardContent className="pt-5 pb-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-neutral-500 text-xs font-medium">حضور مجاني</span>
-              <Gift className="w-4 h-4 text-blue-500" />
-            </div>
-            <div className="text-2xl font-bold text-blue-600">{freeAttendees}</div>
-          </CardContent>
-        </Card>
-
-        {/* Unpaid Attendees */}
-        <Card className="border-none shadow-sm">
-          <CardContent className="pt-5 pb-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-neutral-500 text-xs font-medium">غير مدفوع</span>
-              <UserX className="w-4 h-4 text-amber-500" />
-            </div>
-            <div className="text-2xl font-bold text-amber-600">{unpaidAttendees}</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* ===== SECTION 3: Payment Progress Bar ===== */}
-      {totalAttendees > 0 && (
-        <Card className="border-none shadow-sm">
-          <CardContent className="pt-5 pb-4">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-bold text-neutral-700">توزيع حالة الدفع</span>
-              <span className="text-xs text-neutral-500">{totalAttendees} حضور إجمالي</span>
-            </div>
-            {/* Progress Bar */}
-            <div className="w-full h-4 bg-neutral-100 rounded-full overflow-hidden flex">
-              {paidPercent > 0 && (
-                <div
-                  className="h-full bg-emerald-500 transition-all duration-500"
-                  style={{ width: `${paidPercent}%` }}
-                  title={`مدفوع: ${paidAttendees} (${paidPercent.toFixed(0)}%)`}
-                />
-              )}
-              {freePercent > 0 && (
-                <div
-                  className="h-full bg-blue-500 transition-all duration-500"
-                  style={{ width: `${freePercent}%` }}
-                  title={`مجاني: ${freeAttendees} (${freePercent.toFixed(0)}%)`}
-                />
-              )}
-              {unpaidPercent > 0 && (
-                <div
-                  className="h-full bg-amber-400 transition-all duration-500"
-                  style={{ width: `${unpaidPercent}%` }}
-                  title={`غير مدفوع: ${unpaidAttendees} (${unpaidPercent.toFixed(0)}%)`}
-                />
-              )}
-            </div>
-            {/* Legend */}
-            <div className="flex items-center gap-6 mt-3 text-xs">
-              <span className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded-full bg-emerald-500 inline-block" />
-                مدفوع ({paidAttendees} — {paidPercent.toFixed(0)}%)
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded-full bg-blue-500 inline-block" />
-                مجاني ({freeAttendees} — {freePercent.toFixed(0)}%)
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded-full bg-amber-400 inline-block" />
-                غير مدفوع ({unpaidAttendees} — {unpaidPercent.toFixed(0)}%)
-              </span>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* ===== SECTION 4: Bookings Table ===== */}
-      <Card className="border-none shadow-sm">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Users className="w-5 h-5 text-blue-500" />
-              قائمة الحجوزات
-              <Badge variant="outline" className="mr-2 text-xs bg-neutral-50">{activityBookings.length} حجز</Badge>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <DollarSign className="w-5 h-5 text-emerald-500" /> الملخص المالي
             </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-4">
+              {/* Pie */}
+              <div className="w-[160px] h-[160px] shrink-0">
+                {financialPieData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={financialPieData}
+                        cx="50%" cy="50%"
+                        innerRadius={40} outerRadius={65}
+                        paddingAngle={4}
+                        dataKey="value"
+                      >
+                        {financialPieData.map((entry, i) => (
+                          <Cell key={i} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(v: number) => [`${v.toLocaleString()} ${CURRENCY}`, '']} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-neutral-300">
+                    <DollarSign className="w-10 h-10" />
+                  </div>
+                )}
+              </div>
+              {/* Stats */}
+              <div className="flex-1 space-y-3">
+                <div className="flex items-center justify-between p-2.5 bg-neutral-900 rounded-lg">
+                  <span className="text-neutral-300 text-sm">صافي الربح</span>
+                  <span className={`font-bold text-lg ${profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {profit.toLocaleString()} {CURRENCY}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 text-sm text-neutral-500">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
+                    الإيرادات
+                  </span>
+                  <span className="font-bold text-emerald-600">+{revenue.toLocaleString()} {CURRENCY}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 text-sm text-neutral-500">
+                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block" />
+                    التكاليف
+                  </span>
+                  <span className="font-bold text-rose-600">-{expense.toLocaleString()} {CURRENCY}</span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Attendance Chart */}
+        <Card className="border-none shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Users className="w-5 h-5 text-blue-500" /> توزيع الحضور
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-4">
+              {/* Pie */}
+              <div className="w-[160px] h-[160px] shrink-0">
+                {attendancePieData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={attendancePieData}
+                        cx="50%" cy="50%"
+                        innerRadius={40} outerRadius={65}
+                        paddingAngle={4}
+                        dataKey="value"
+                      >
+                        {attendancePieData.map((entry, i) => (
+                          <Cell key={i} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(v: number) => [`${v} شخص`, '']} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-neutral-300">
+                    <Users className="w-10 h-10" />
+                  </div>
+                )}
+              </div>
+              {/* Stats */}
+              <div className="flex-1 space-y-3">
+                <div className="flex items-center justify-between p-2.5 bg-neutral-900 rounded-lg">
+                  <span className="text-neutral-300 text-sm">إجمالي الحضور</span>
+                  <span className="font-bold text-lg text-white">
+                    {totalAttendees} <span className="text-xs text-neutral-400 font-normal">من {activityBookings.length} حجز</span>
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 text-sm text-neutral-500">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
+                    مدفوع
+                  </span>
+                  <span className="font-bold text-emerald-600">{paidAttendees}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 text-sm text-neutral-500">
+                    <span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block" />
+                    مجاني
+                  </span>
+                  <span className="font-bold text-blue-600">{freeAttendees}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 text-sm text-neutral-500">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block" />
+                    غير مدفوع
+                  </span>
+                  <span className="font-bold text-amber-600">{unpaidAttendees}</span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ===== BOOKINGS TABLE (Collapsible) ===== */}
+      <Card className="border-none shadow-sm">
+        <button
+          onClick={() => setBookingsOpen(!bookingsOpen)}
+          className="w-full flex items-center justify-between px-6 py-4 hover:bg-neutral-50 transition-colors rounded-t-xl"
+        >
+          <div className="flex items-center gap-2">
+            <Users className="w-5 h-5 text-blue-500" />
+            <span className="text-lg font-bold text-neutral-900">قائمة الحجوزات</span>
+            <Badge variant="outline" className="mr-2 text-xs bg-neutral-50">{activityBookings.length} حجز</Badge>
           </div>
-        </CardHeader>
-        <CardContent>
-          {activityBookings.length > 0 ? (
-            <div className="border border-neutral-100 rounded-xl overflow-hidden">
-              <Table dir="rtl">
-                <TableHeader>
-                  <TableRow className="bg-neutral-50/80">
-                    <TableHead className="text-right w-10 font-bold">#</TableHead>
-                    <TableHead className="text-right font-bold">الاسم</TableHead>
-                    <TableHead className="text-right font-bold">الهاتف</TableHead>
-                    <TableHead className="text-center font-bold">العدد</TableHead>
-                    <TableHead className="text-center font-bold">الحالة</TableHead>
-                    <TableHead className="text-center font-bold">المبلغ</TableHead>
-                    <TableHead className="text-right font-bold">المستلم</TableHead>
-                    <TableHead className="text-right font-bold">ملاحظات</TableHead>
-                    <TableHead className="text-right font-bold">التاريخ</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {activityBookings.map((booking, index) => (
-                    <TableRow key={booking.id} className="hover:bg-neutral-50/50 transition-colors">
-                      <TableCell className="text-neutral-400 text-xs font-mono">{index + 1}</TableCell>
-                      <TableCell className="font-medium text-neutral-900">{booking.name}</TableCell>
-                      <TableCell className="text-neutral-600 text-sm" dir="ltr">
-                        {booking.phone || <span className="text-neutral-300">—</span>}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <span className="bg-neutral-100 text-neutral-800 px-2 py-0.5 rounded-md text-sm font-bold">
-                          {booking.count}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {booking.isFree ? (
-                          <Badge variant="secondary" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">مجاني</Badge>
-                        ) : booking.isPaid ? (
-                          <Badge variant="secondary" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs">مدفوع</Badge>
-                        ) : (
-                          <Badge variant="secondary" className="bg-amber-50 text-amber-700 border-amber-200 text-xs">غير مدفوع</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-center font-medium">
-                        {booking.isFree ? (
-                          <span className="text-neutral-400">—</span>
-                        ) : (
-                          <span className={booking.isPaid ? 'text-emerald-600' : 'text-amber-600'}>
-                            {booking.paidAmount} {CURRENCY}
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-neutral-600 text-sm">{booking.receivedBy || <span className="text-neutral-300">—</span>}</TableCell>
-                      <TableCell className="text-neutral-500 text-xs max-w-[150px] truncate" title={booking.notes}>
-                        {booking.notes || <span className="text-neutral-300">—</span>}
-                      </TableCell>
-                      <TableCell className="text-neutral-400 text-xs whitespace-nowrap">
-                        {booking.createdAt ? format(safeDate(booking.createdAt), 'MM/dd hh:mm a') : '—'}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          ) : (
-            <div className="text-center py-12 bg-neutral-50/50 rounded-xl border border-dashed border-neutral-200">
-              <Users className="w-10 h-10 mx-auto mb-3 text-neutral-300" />
-              <p className="text-neutral-500 font-medium">لا توجد حجوزات لهذا النشاط بعد</p>
-              <p className="text-xs text-neutral-400 mt-1">يمكنك إضافة حجوزات من تبويب "قاعدة الحجوزات"</p>
-            </div>
-          )}
-
-          {/* Bookings Summary Footer */}
-          {activityBookings.length > 0 && (
-            <div className="mt-4 flex flex-wrap items-center gap-6 text-sm text-neutral-500 bg-neutral-50 rounded-lg p-3 border border-neutral-100">
-              <span className="flex items-center gap-1.5">
-                <Users className="w-4 h-4" />
-                <strong className="text-neutral-700">{totalAttendees}</strong> حضور إجمالي
-              </span>
-              <span className="flex items-center gap-1.5">
-                <CreditCard className="w-4 h-4" />
-                <strong className="text-emerald-600">{revenue.toLocaleString()} {CURRENCY}</strong> إجمالي المحصّل
-              </span>
-              <span className="flex items-center gap-1.5">
-                <Ticket className="w-4 h-4" />
-                <strong className="text-neutral-700">{activity.basePrice} {CURRENCY}</strong> سعر التذكرة
-              </span>
-              {unpaidAttendees > 0 && (
-                <span className="flex items-center gap-1.5 text-amber-600">
-                  <AlertTriangle className="w-4 h-4" />
-                  <strong>{unpaidAttendees}</strong> لم يدفعوا بعد ({(activity.basePrice * unpaidAttendees).toLocaleString()} {CURRENCY} متوقع)
-                </span>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* ===== SECTION 5: Costs Table ===== */}
-      <Card className="border-none shadow-sm">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Receipt className="w-5 h-5 text-rose-500" />
-              تكاليف النشاط
-              <Badge variant="outline" className="mr-2 text-xs bg-neutral-50">{activityCosts.length} بند</Badge>
-            </CardTitle>
-            {activityCosts.length > 0 && (
-              <span className="text-sm font-bold text-rose-600">
-                الإجمالي: {expense.toLocaleString()} {CURRENCY}
+          <div className="flex items-center gap-3">
+            {unpaidAttendees > 0 && (
+              <span className="text-xs text-amber-600 flex items-center gap-1">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                {unpaidAttendees} لم يدفعوا
               </span>
             )}
+            {bookingsOpen ? <ChevronUp className="w-5 h-5 text-neutral-400" /> : <ChevronDown className="w-5 h-5 text-neutral-400" />}
           </div>
-        </CardHeader>
-        <CardContent>
-          {activityCosts.length > 0 ? (
-            <div className="border border-neutral-100 rounded-xl overflow-hidden">
-              <Table dir="rtl">
-                <TableHeader>
-                  <TableRow className="bg-neutral-50/80">
-                    <TableHead className="text-right w-10 font-bold">#</TableHead>
-                    <TableHead className="text-right font-bold">البند</TableHead>
-                    <TableHead className="text-center font-bold">المبلغ</TableHead>
-                    <TableHead className="text-right font-bold">المدفوع بواسطة</TableHead>
-                    <TableHead className="text-right font-bold">التاريخ</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {activityCosts.map((cost, index) => (
-                    <TableRow key={cost.id} className="hover:bg-neutral-50/50 transition-colors">
-                      <TableCell className="text-neutral-400 text-xs font-mono">{index + 1}</TableCell>
-                      <TableCell className="font-medium text-neutral-900">{cost.item}</TableCell>
-                      <TableCell className="text-center font-bold text-rose-600">{cost.amount.toLocaleString()} {CURRENCY}</TableCell>
-                      <TableCell className="text-neutral-600">{cost.paidBy}</TableCell>
-                      <TableCell className="text-neutral-400 text-sm whitespace-nowrap">
-                        {cost.date ? format(safeDate(cost.date), 'yyyy/MM/dd') : '—'}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          ) : (
-            <div className="text-center py-10 bg-neutral-50/50 rounded-xl border border-dashed border-neutral-200">
-              <Receipt className="w-10 h-10 mx-auto mb-3 text-neutral-300" />
-              <p className="text-neutral-500 font-medium">لا توجد تكاليف مسجلة لهذا النشاط</p>
-            </div>
-          )}
-        </CardContent>
+        </button>
+        
+        {bookingsOpen && (
+          <CardContent className="pt-0">
+            {activityBookings.length > 0 ? (
+              <>
+                <div className="border border-neutral-100 rounded-xl overflow-hidden">
+                  <Table dir="rtl">
+                    <TableHeader>
+                      <TableRow className="bg-neutral-50/80">
+                        <TableHead className="text-right w-10 font-bold">#</TableHead>
+                        <TableHead className="text-right font-bold">الاسم</TableHead>
+                        <TableHead className="text-right font-bold">الهاتف</TableHead>
+                        <TableHead className="text-center font-bold">العدد</TableHead>
+                        <TableHead className="text-center font-bold">الحالة</TableHead>
+                        <TableHead className="text-center font-bold">المبلغ</TableHead>
+                        <TableHead className="text-right font-bold">المستلم</TableHead>
+                        <TableHead className="text-right font-bold">ملاحظات</TableHead>
+                        <TableHead className="text-right font-bold">التاريخ</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {activityBookings.map((booking, index) => (
+                        <TableRow key={booking.id} className="hover:bg-neutral-50/50 transition-colors">
+                          <TableCell className="text-neutral-400 text-xs font-mono">{index + 1}</TableCell>
+                          <TableCell className="font-medium text-neutral-900">{booking.name}</TableCell>
+                          <TableCell className="text-neutral-600 text-sm" dir="ltr">
+                            {booking.phone || <span className="text-neutral-300">—</span>}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <span className="bg-neutral-100 text-neutral-800 px-2 py-0.5 rounded-md text-sm font-bold">
+                              {booking.count}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {booking.isFree ? (
+                              <Badge variant="secondary" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">مجاني</Badge>
+                            ) : booking.isPaid ? (
+                              <Badge variant="secondary" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs">مدفوع</Badge>
+                            ) : (
+                              <Badge variant="secondary" className="bg-amber-50 text-amber-700 border-amber-200 text-xs">غير مدفوع</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center font-medium">
+                            {booking.isFree ? (
+                              <span className="text-neutral-400">—</span>
+                            ) : (
+                              <span className={booking.isPaid ? 'text-emerald-600' : 'text-amber-600'}>
+                                {booking.paidAmount} {CURRENCY}
+                              </span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-neutral-600 text-sm">{booking.receivedBy || <span className="text-neutral-300">—</span>}</TableCell>
+                          <TableCell className="text-neutral-500 text-xs max-w-[150px] truncate" title={booking.notes}>
+                            {booking.notes || <span className="text-neutral-300">—</span>}
+                          </TableCell>
+                          <TableCell className="text-neutral-400 text-xs whitespace-nowrap">
+                            {booking.createdAt ? format(safeDate(booking.createdAt), 'MM/dd hh:mm a') : '—'}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                {/* Summary Footer */}
+                <div className="mt-3 flex flex-wrap items-center gap-5 text-sm text-neutral-500 bg-neutral-50 rounded-lg p-3 border border-neutral-100">
+                  <span className="flex items-center gap-1.5">
+                    <Users className="w-4 h-4" />
+                    <strong className="text-neutral-700">{totalAttendees}</strong> حضور
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <CreditCard className="w-4 h-4" />
+                    <strong className="text-emerald-600">{revenue.toLocaleString()} {CURRENCY}</strong> محصّل
+                  </span>
+                  {unpaidAttendees > 0 && (
+                    <span className="flex items-center gap-1.5 text-amber-600">
+                      <AlertTriangle className="w-4 h-4" />
+                      <strong>{(activity.basePrice * unpaidAttendees).toLocaleString()} {CURRENCY}</strong> متوقع تحصيله
+                    </span>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="text-center py-10 bg-neutral-50/50 rounded-xl border border-dashed border-neutral-200">
+                <Users className="w-10 h-10 mx-auto mb-3 text-neutral-300" />
+                <p className="text-neutral-500 font-medium">لا توجد حجوزات لهذا النشاط بعد</p>
+              </div>
+            )}
+          </CardContent>
+        )}
       </Card>
 
-      {/* ===== SECTION 6: Location + Drive (Side by Side) ===== */}
+      {/* ===== COSTS TABLE (Collapsible) ===== */}
+      <Card className="border-none shadow-sm">
+        <button
+          onClick={() => setCostsOpen(!costsOpen)}
+          className="w-full flex items-center justify-between px-6 py-4 hover:bg-neutral-50 transition-colors rounded-t-xl"
+        >
+          <div className="flex items-center gap-2">
+            <Receipt className="w-5 h-5 text-rose-500" />
+            <span className="text-lg font-bold text-neutral-900">تكاليف النشاط</span>
+            <Badge variant="outline" className="mr-2 text-xs bg-neutral-50">{activityCosts.length} بند</Badge>
+          </div>
+          <div className="flex items-center gap-3">
+            {activityCosts.length > 0 && (
+              <span className="text-sm font-bold text-rose-600">{expense.toLocaleString()} {CURRENCY}</span>
+            )}
+            {costsOpen ? <ChevronUp className="w-5 h-5 text-neutral-400" /> : <ChevronDown className="w-5 h-5 text-neutral-400" />}
+          </div>
+        </button>
+        
+        {costsOpen && (
+          <CardContent className="pt-0">
+            {activityCosts.length > 0 ? (
+              <div className="border border-neutral-100 rounded-xl overflow-hidden">
+                <Table dir="rtl">
+                  <TableHeader>
+                    <TableRow className="bg-neutral-50/80">
+                      <TableHead className="text-right w-10 font-bold">#</TableHead>
+                      <TableHead className="text-right font-bold">البند</TableHead>
+                      <TableHead className="text-center font-bold">المبلغ</TableHead>
+                      <TableHead className="text-right font-bold">المدفوع بواسطة</TableHead>
+                      <TableHead className="text-right font-bold">التاريخ</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {activityCosts.map((cost, index) => (
+                      <TableRow key={cost.id} className="hover:bg-neutral-50/50 transition-colors">
+                        <TableCell className="text-neutral-400 text-xs font-mono">{index + 1}</TableCell>
+                        <TableCell className="font-medium text-neutral-900">{cost.item}</TableCell>
+                        <TableCell className="text-center font-bold text-rose-600">{cost.amount.toLocaleString()} {CURRENCY}</TableCell>
+                        <TableCell className="text-neutral-600">{cost.paidBy}</TableCell>
+                        <TableCell className="text-neutral-400 text-sm whitespace-nowrap">
+                          {cost.date ? format(safeDate(cost.date), 'yyyy/MM/dd') : '—'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <div className="text-center py-8 bg-neutral-50/50 rounded-xl border border-dashed border-neutral-200">
+                <Receipt className="w-10 h-10 mx-auto mb-3 text-neutral-300" />
+                <p className="text-neutral-500 font-medium">لا توجد تكاليف مسجلة</p>
+              </div>
+            )}
+          </CardContent>
+        )}
+      </Card>
+
+      {/* ===== LOCATION + DRIVE (Dynamic Height) ===== */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* Location details */}
-        <div className="space-y-6 lg:col-span-1">
+        {/* Location Card (measured for Drive height) */}
+        <div className="lg:col-span-1" ref={locationRef}>
           <Card className="border-none shadow-sm">
             <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center gap-2">
@@ -457,8 +476,8 @@ export default function ActivityDetails({ activity, location, bookings, costs, o
           </Card>
         </div>
 
-        {/* Drive Embed */}
-        <div className="lg:col-span-2 min-h-[1500px] flex flex-col">
+        {/* Drive Embed (height = 2.5 × location card) */}
+        <div className="lg:col-span-2 flex flex-col" style={{ minHeight: `${driveHeight}px` }}>
           <Card className="border-none shadow-sm flex-1 flex flex-col overflow-hidden relative">
             <CardHeader className="border-b border-neutral-100 bg-white z-10 shrink-0 pb-4 pt-5 px-6">
               <CardTitle className="text-lg">
