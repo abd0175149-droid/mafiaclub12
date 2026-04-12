@@ -62,10 +62,10 @@ export default function ActivityDetails({ activity, location, bookings, costs, o
   const unpaidPercent = totalAttendees > 0 ? (unpaidAttendees / totalAttendees) * 100 : 0;
 
   return (
-    <div className="space-y-6 h-[calc(100vh-80px)] overflow-auto pb-10" dir="rtl">
+    <div className="space-y-6 pb-10" dir="rtl">
       
       {/* ===== SECTION 1: Enhanced Header ===== */}
-      <div className="sticky top-0 bg-neutral-50/80 backdrop-blur-md z-10 pb-4">
+      <div className="pb-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Button variant="outline" size="icon" onClick={onBack} className="rounded-full h-10 w-10 shrink-0">

@@ -239,17 +239,6 @@ export default function Dashboard() {
 
   if (loading) return <div className="flex items-center justify-center h-screen">Loading...</div>;
 
-  if (selectedActivity) {
-    return (
-      <ActivityDetails
-        activity={selectedActivity}
-        location={locations.find(l => l.id == selectedActivity.locationId) || null}
-        bookings={bookings}
-        costs={costs}
-        onBack={() => setSelectedActivity(null)}
-      />
-    );
-  }
 
   return (
     <div className="flex h-screen bg-neutral-50 overflow-hidden relative" dir="rtl">
@@ -368,7 +357,7 @@ export default function Dashboard() {
 
         <div className="p-4 md:p-8 max-w-[1600px] mx-auto space-y-8">
 
-          <div className={activeTab === 'overview' ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
+          <div className={activeTab === 'overview' && !selectedActivity ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
             <h2 className="text-2xl font-bold mb-6">نظرة عامة والتحليلات</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {settings?.dashboardLayout.includes('revenue') && (
@@ -502,7 +491,7 @@ export default function Dashboard() {
             </Card>
           </div>
 
-          <div className={activeTab === 'activities' ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
+          <div className={activeTab === 'activities' && !selectedActivity ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
             <div className="space-y-6">
               <div className="flex items-center justify-between mb-6">
                 <div>
@@ -609,19 +598,19 @@ export default function Dashboard() {
             </Dialog>
           </div>
 
-          <div className={activeTab === 'bookings' ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
+          <div className={activeTab === 'bookings' && !selectedActivity ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
             <BookingsTabContent bookings={bookings} activities={activities} fetchAll={fetchAll} staff={staff} profile={profile} />
           </div>
 
-          <div className={activeTab === 'finances' ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
+          <div className={activeTab === 'finances' && !selectedActivity ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
             <FinanceView activities={activities} bookings={bookings} costs={costs} foundationalCosts={foundationalCosts} fetchData={fetchAll} staff={staff} />
           </div>
 
-          <div className={activeTab === 'locations' ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
+          <div className={activeTab === 'locations' && !selectedActivity ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
             <LocationsView />
           </div>
 
-          <div className={activeTab === 'profile' ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
+          <div className={activeTab === 'profile' && !selectedActivity ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               <div className="lg:col-span-2">
                 <ProfileTab />
@@ -659,8 +648,21 @@ export default function Dashboard() {
           </div>
 
           {isAdmin && (
-            <div className={activeTab === 'users' ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
+            <div className={activeTab === 'users' && !selectedActivity ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
               <UserManagementTab users={staff} fetchAll={fetchAll} />
+            </div>
+          )}
+
+          {/* Activity Details (rendered inside layout) */}
+          {selectedActivity && (
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <ActivityDetails
+                activity={selectedActivity}
+                location={locations.find(l => l.id == selectedActivity.locationId) || null}
+                bookings={bookings}
+                costs={costs}
+                onBack={() => setSelectedActivity(null)}
+              />
             </div>
           )}
         </div>
