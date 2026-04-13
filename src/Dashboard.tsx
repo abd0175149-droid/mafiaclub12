@@ -521,7 +521,7 @@ export default function Dashboard() {
           </div>
 
           <div className={activeTab === 'activities' && !selectedActivity ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
-            <div className="flex flex-col h-[calc(100vh-8rem)]">
+            <div className="flex flex-col" style={{ height: 'calc(100vh - 11rem)' }}>
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h2 className="text-xl font-bold">الأنشطة المجدولة</h2>
@@ -530,7 +530,7 @@ export default function Dashboard() {
                 {!isLocationOwner && <ActivityForm locations={locations} fetchAll={fetchAll} />}
               </div>
               {/* Activity Filters */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-neutral-50 p-3 rounded-xl border border-neutral-100">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-2 bg-neutral-50 p-2 rounded-xl border border-neutral-100 mb-3">
                 <div className="flex items-center gap-2">
                   <Filter className="w-4 h-4 text-neutral-400 shrink-0" />
                   <Select value={actFilterStatus} onValueChange={setActFilterStatus}>
@@ -553,8 +553,8 @@ export default function Dashboard() {
                   )}
                 </div>
               </div>
-              <div className="flex flex-col flex-1 min-h-0 gap-3">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 flex-1 min-h-0 auto-rows-fr">
+              <div className="flex flex-col flex-1 min-h-0 gap-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 flex-1 min-h-0 content-start overflow-hidden">
                   {filteredActivities.length > 0 ? activitiesPagination.paginatedData.map(activity => (
                     <div key={activity.id}>
                       <ActivityCard 
@@ -869,25 +869,25 @@ interface ActivityCardProps {
 const ActivityCard: React.FC<ActivityCardProps> = ({ activity, stats, onDelete, onStatusChange, onSelect, onEdit }) => {
   return (
     <Card className="border-none shadow-sm hover:shadow-md transition-shadow">
-      <CardHeader className="pb-2">
+      <CardHeader className="pb-1 pt-3 px-4">
         <div className="flex justify-between items-start">
           <Badge variant="secondary" className={STATUS_COLORS[activity.status]}>
             {STATUS_LABELS[activity.status]}
           </Badge>
           <p className="text-xs text-neutral-500">{format(safeDate(activity.date)!, 'yyyy/MM/dd')}</p>
         </div>
-        <CardTitle className="mt-2">{activity.name}</CardTitle>
-        <CardDescription className="line-clamp-2">{activity.description}</CardDescription>
+        <CardTitle className="mt-1 text-sm">{activity.name}</CardTitle>
+        <CardDescription className="line-clamp-1 text-xs">{activity.description}</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="bg-neutral-50 p-3 rounded-lg">
+      <CardContent className="space-y-2 pb-3 px-4 pt-1">
+        <div className="grid grid-cols-2 gap-2">
+          <div className="bg-neutral-50 p-2 rounded-lg">
             <p className="text-[10px] text-neutral-500 uppercase font-bold">الحضور</p>
-            <p className="text-lg font-bold">{stats.attendees}</p>
+            <p className="text-base font-bold">{stats.attendees}</p>
           </div>
-          <div className="bg-neutral-50 p-3 rounded-lg">
+          <div className="bg-neutral-50 p-2 rounded-lg">
             <p className="text-[10px] text-neutral-500 uppercase font-bold">الربح</p>
-            <p className={`text-lg font-bold ${stats.profit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+            <p className={`text-base font-bold ${stats.profit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
               {stats.profit} {CURRENCY}
             </p>
           </div>
@@ -897,13 +897,13 @@ const ActivityCard: React.FC<ActivityCardProps> = ({ activity, stats, onDelete, 
           <span className="flex items-center gap-1"><DollarSign className="w-3 h-3" /> {activity.basePrice} {CURRENCY} / شخص</span>
         </div>
         {/* Status + View + Delete */}
-        <div className="flex items-center gap-2 pt-2 border-t border-neutral-100">
+        <div className="flex items-center gap-2 pt-1.5 border-t border-neutral-100">
           {onStatusChange ? (
             <Select
               value={activity.status}
               onValueChange={async (v) => { try { await apiPut('/activities/' + activity.id, { status: v }); if (onStatusChange) onStatusChange(); } catch (e) { console.error(e); } }}
             >
-              <SelectTrigger className="h-8 text-xs flex-1">
+              <SelectTrigger className="h-7 text-xs flex-1">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -918,17 +918,17 @@ const ActivityCard: React.FC<ActivityCardProps> = ({ activity, stats, onDelete, 
           )}
           <div className="flex items-center gap-1">
             {onEdit && activity.status === 'planned' && (
-              <button type="button" title="تعديل النشاط" className="inline-flex items-center justify-center text-amber-500 h-8 w-8 rounded-md hover:bg-amber-50 transition-colors" onClick={() => { if (onEdit) onEdit(); }}>
+              <button type="button" title="تعديل النشاط" className="inline-flex items-center justify-center text-amber-500 h-7 w-7 rounded-md hover:bg-amber-50 transition-colors" onClick={() => { if (onEdit) onEdit(); }}>
                 <Pencil className="w-4 h-4" />
               </button>
             )}
             {onSelect && (
-              <button type="button" title="عرض التفاصيل" className="inline-flex items-center justify-center text-blue-600 h-8 w-8 rounded-md hover:bg-blue-50 transition-colors" onClick={() => { if (onSelect) onSelect(); }}>
+              <button type="button" title="عرض التفاصيل" className="inline-flex items-center justify-center text-blue-600 h-7 w-7 rounded-md hover:bg-blue-50 transition-colors" onClick={() => { if (onSelect) onSelect(); }}>
                 <Info className="w-4 h-4" />
               </button>
             )}
             {onDelete && (
-              <button type="button" title="حذف" className="inline-flex items-center justify-center text-rose-500 h-8 w-8 rounded-md hover:bg-rose-50 transition-colors" onClick={() => { if (onDelete) onDelete(); }}>
+              <button type="button" title="حذف" className="inline-flex items-center justify-center text-rose-500 h-7 w-7 rounded-md hover:bg-rose-50 transition-colors" onClick={() => { if (onDelete) onDelete(); }}>
                 <Trash2 className="w-4 h-4" />
               </button>
             )}
