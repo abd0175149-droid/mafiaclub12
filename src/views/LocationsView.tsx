@@ -172,11 +172,11 @@ export default function LocationsView() {
           <Button onClick={handleOpenNew} className="bg-neutral-900 text-white hover:bg-neutral-800">
             <Plus className="w-4 h-4 ml-2" /> إضافة مكان جديد
           </Button>
-          <DialogContent className="sm:max-w-[600px] max-h-[85vh] flex flex-col" dir="rtl">
+          <DialogContent className="sm:max-w-[600px]" dir="rtl">
             <DialogHeader>
               <DialogTitle>{editingLoc ? 'تعديل بيانات المكان' : 'إضافة مكان جديد'}</DialogTitle>
             </DialogHeader>
-            <div className="space-y-6 py-4 overflow-y-auto flex-1 pr-1">
+            <div className="space-y-6 py-4 max-h-[80vh] overflow-y-auto px-1 pb-4">
               <div className="space-y-2">
                 <Label>اسم المكان (الكافيه / القهوة) <span className="text-red-500">*</span></Label>
                 <Input value={name} onChange={e => setName(e.target.value)} placeholder="مثال: The Coffee Bean" />
