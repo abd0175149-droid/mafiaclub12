@@ -107,6 +107,7 @@ db.exec(`
 // Safe migrations for existing tables
 try { db.exec('ALTER TABLE activities ADD COLUMN locationId INTEGER REFERENCES locations(id) ON DELETE SET NULL'); } catch (e) { /* Column already exists */ }
 try { db.exec('ALTER TABLE activities ADD COLUMN driveLink TEXT DEFAULT ""'); } catch (e) { /* Column already exists */ }
+try { db.exec('ALTER TABLE activities ADD COLUMN isLocked INTEGER DEFAULT 0'); } catch (e) { /* Column already exists */ }
 // Safe migrations for staff table
 try { db.exec('ALTER TABLE staff ADD COLUMN photoURL TEXT DEFAULT NULL'); } catch (e) { /* Column already exists */ }
 try { db.exec('ALTER TABLE staff ADD COLUMN permissions TEXT DEFAULT \'["activities","bookings","finances","locations"]\''); } catch (e) { /* Column already exists */ }

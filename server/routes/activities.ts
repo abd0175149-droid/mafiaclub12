@@ -8,23 +8,29 @@ const router = Router();
 router.get('/', requireAuth, (req: AuthRequest, res) => {
   if (req.user?.role === 'location_owner' && req.user.locationId) {
     const rows = db.prepare('SELECT * FROM activities WHERE locationId = ? ORDER BY date DESC').all(req.user.locationId) as any[];
-    rows.forEach(r => { try { r.enabledOfferIds = JSON.parse(r.enabledOfferIds || '[]'); } catch { r.enabledOfferIds = []; } });
+    rows.forEach(r => { 
+      try { r.enabledOfferIds = JSON.parse(r.enabledOfferIds || '[]'); } catch { r.enabledOfferIds = []; } 
+      r.isLocked = r.isLocked === 1;
+    });
     return res.json(rows);
   }
   const rows = db.prepare('SELECT * FROM activities ORDER BY date DESC').all() as any[];
-  rows.forEach(r => { try { r.enabledOfferIds = JSON.parse(r.enabledOfferIds || '[]'); } catch { r.enabledOfferIds = []; } });
+  rows.forEach(r => { 
+    try { r.enabledOfferIds = JSON.parse(r.enabledOfferIds || '[]'); } catch { r.enabledOfferIds = []; } 
+    r.isLocked = r.isLocked === 1;
+  });
   res.json(rows);
 });
 
 // POST /api/activities
 router.post('/', requireAuth, requirePermission('activities'), (req: AuthRequest, res) => {
-  const { name, date, description, basePrice, status, locationId, driveLink, enabledOfferIds } = req.body;
+  const { name, date, description, basePrice, status, locationId, driveLink, enabledOfferIds, isLocked } = req.body;
   if (!name || !date) return res.status(400).json({ error: 'الاسم والتاريخ مطلوبان' });
 
   const enabledOffersStr = JSON.stringify(Array.isArray(enabledOfferIds) ? enabledOfferIds : []);
   const result = db.prepare(
-    'INSERT INTO activities (name, date, description, basePrice, status, locationId, driveLink, enabledOfferIds) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-  ).run(name, date, description || '', basePrice || 0, status || 'planned', locationId || null, driveLink || '', enabledOffersStr);
+    'INSERT INTO activities (name, date, description, basePrice, status, locationId, driveLink, enabledOfferIds, isLocked) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+  ).run(name, date, description || '', basePrice || 0, status || 'planned', locationId || null, driveLink || '', enabledOffersStr, isLocked ? 1 : 0);
 
   logAudit(req.user!.id, 'create', 'activities', Number(result.lastInsertRowid));
 
@@ -52,12 +58,12 @@ router.post('/', requireAuth, requirePermission('activities'), (req: AuthRequest
 // PUT /api/activities/:id
 router.put('/:id', requireAuth, requirePermission('activities'), (req: AuthRequest, res) => {
   const { id } = req.params;
-  const { name, date, description, basePrice, status, locationId, driveLink, enabledOfferIds } = req.body;
+  const { name, date, description, basePrice, status, locationId, driveLink, enabledOfferIds, isLocked } = req.body;
 
   const enabledOffersStr = enabledOfferIds !== undefined ? JSON.stringify(Array.isArray(enabledOfferIds) ? enabledOfferIds : []) : null;
   db.prepare(
-    'UPDATE activities SET name=COALESCE(?,name), date=COALESCE(?,date), description=COALESCE(?,description), basePrice=COALESCE(?,basePrice), status=COALESCE(?,status), locationId=COALESCE(?,locationId), driveLink=COALESCE(?,driveLink), enabledOfferIds=COALESCE(?,enabledOfferIds) WHERE id=?'
-  ).run(name, date, description, basePrice, status, locationId !== undefined ? locationId : null, driveLink !== undefined ? driveLink : null, enabledOffersStr, id);
+    'UPDATE activities SET name=COALESCE(?,name), date=COALESCE(?,date), description=COALESCE(?,description), basePrice=COALESCE(?,basePrice), status=COALESCE(?,status), locationId=COALESCE(?,locationId), driveLink=COALESCE(?,driveLink), enabledOfferIds=COALESCE(?,enabledOfferIds), isLocked=COALESCE(?,isLocked) WHERE id=?'
+  ).run(name, date, description, basePrice, status, locationId !== undefined ? locationId : null, driveLink !== undefined ? driveLink : null, enabledOffersStr, isLocked !== undefined ? (isLocked ? 1 : 0) : null, id);
 
   logAudit(req.user!.id, 'update', 'activities', id, req.body);
   const activity = db.prepare('SELECT * FROM activities WHERE id = ?').get(id) as any;
