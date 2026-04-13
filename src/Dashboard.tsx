@@ -1115,9 +1115,11 @@ function BookingsTabContent({ bookings, activities, fetchAll, staff, profile, lo
                     <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-600" title="عرض التفاصيل" onClick={() => setViewingBooking(booking)}>
                       <Eye className="w-3.5 h-3.5" />
                     </Button>
-                    <Button size="icon" variant="ghost" className="h-8 w-8" title="تعديل" onClick={() => setEditingBooking(booking)}>
-                      <Pencil className="w-3.5 h-3.5" />
-                    </Button>
+                    {(!booking.isPaid || profile?.username === 'admin') && (
+                      <Button size="icon" variant="ghost" className="h-8 w-8" title="تعديل" onClick={() => setEditingBooking(booking)}>
+                        <Pencil className="w-3.5 h-3.5" />
+                      </Button>
+                    )}
                     {!booking.isPaid && !booking.isFree && (
                       <Button size="sm" variant="outline" className="h-8 text-xs" onClick={async () => {
                         const activity = activities.find(a => a.id === booking.activityId);
@@ -1222,12 +1224,18 @@ function BookingsTabContent({ bookings, activities, fetchAll, staff, profile, lo
               </div>
               <div className="space-y-2">
                 <Label>المستلم</Label>
-                <Input 
+                <Select 
                   name="receivedBy" 
-                  defaultValue={editingBooking.receivedBy || ''} 
+                  defaultValue={editingBooking.receivedBy || ''}
                   disabled={!!(editingBooking.isPaid && editingBooking.receivedBy && profile?.username !== 'admin')}
-                  className={!!(editingBooking.isPaid && editingBooking.receivedBy && profile?.username !== 'admin') ? 'bg-neutral-100 cursor-not-allowed opacity-70' : ''}
-                />
+                >
+                  <SelectTrigger className={!!(editingBooking.isPaid && editingBooking.receivedBy && profile?.username !== 'admin') ? 'bg-neutral-100 cursor-not-allowed opacity-70' : ''}>
+                    <SelectValue placeholder="اختر الموظف" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {staff.map(s => <SelectItem key={s.id || s.displayName} value={s.displayName}>{s.displayName}</SelectItem>)}
+                  </SelectContent>
+                </Select>
                 {!!(editingBooking.isPaid && editingBooking.receivedBy && profile?.username !== 'admin') && (
                   <p className="text-[10px] text-amber-600 mt-1">لا يمكن تغيير اسم المستلم لحجز مدفوع. (صلاحية المدير العام فقط)</p>
                 )}
