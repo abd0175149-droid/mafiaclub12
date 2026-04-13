@@ -589,7 +589,7 @@ export default function Dashboard() {
             </div>
             {/* Edit Activity Dialog */}
             <Dialog open={!!editingActivityMain} onOpenChange={(o) => { if (!o) setEditingActivityMain(null); }}>
-              <DialogContent dir="rtl">
+              <DialogContent dir="rtl" className="max-h-[85vh] flex flex-col">
                 <DialogHeader>
                   <DialogTitle>تعديل النشاط</DialogTitle>
                 </DialogHeader>
@@ -611,7 +611,7 @@ export default function Dashboard() {
                       toast.success('تم تحديث النشاط بنجاح');
                       fetchAll();
                     } catch (err: any) { toast.error(err.message || 'حدث خطأ عند التحديث'); }
-                  }} className="space-y-4">
+                  }} className="space-y-4 overflow-y-auto flex-1 pr-1">
                     <div className="space-y-2">
                       <Label>اسم النشاط</Label>
                       <Input name="name" required defaultValue={editingActivityMain.name} />
@@ -1141,10 +1141,10 @@ function BookingsTabContent({ bookings, activities, fetchAll, staff, profile, lo
 
       {/* Edit Booking Dialog [BL-05, F-03] */}
       <Dialog open={!!editingBooking} onOpenChange={(o) => { if (!o) setEditingBooking(null); }}>
-        <DialogContent dir="rtl" className="max-w-md">
+        <DialogContent dir="rtl" className="max-w-md max-h-[85vh] flex flex-col">
           <DialogHeader><DialogTitle>تعديل الحجز</DialogTitle></DialogHeader>
           {editingBooking && (
-            <form onSubmit={handleEditSave} className="space-y-4">
+            <form onSubmit={handleEditSave} className="space-y-4 overflow-y-auto flex-1 pr-1">
               <div className="space-y-2">
                 <Label>الاسم</Label>
                 <Input name="name" defaultValue={editingBooking.name} required />
@@ -1189,10 +1189,10 @@ function BookingsTabContent({ bookings, activities, fetchAll, staff, profile, lo
 
       {/* View Booking Details Dialog */}
       <Dialog open={!!viewingBooking} onOpenChange={(o) => { if (!o) setViewingBooking(null); }}>
-        <DialogContent dir="rtl" className="max-w-md">
+        <DialogContent dir="rtl" className="max-w-md max-h-[85vh] flex flex-col">
           <DialogHeader><DialogTitle>تفاصيل الحجز</DialogTitle></DialogHeader>
           {viewingBooking && (
-            <div className="space-y-4">
+            <div className="space-y-4 overflow-y-auto flex-1 pr-1">
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-neutral-50 rounded-lg p-3">
                   <p className="text-[10px] text-neutral-500 uppercase font-bold mb-1">الاسم</p>
@@ -1323,11 +1323,11 @@ function ActivityForm({ locations, fetchAll }: { locations: Location[], fetchAll
           </Button>
         }
       />
-      <DialogContent dir="rtl" className="max-w-lg">
+      <DialogContent dir="rtl" className="max-w-lg max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>إضافة نشاط جديد</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+        <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto flex-1 pr-1">
           <div className="space-y-2">
             <Label>التاريخ</Label>
             <Input name="date" type="datetime-local" required />
@@ -1396,10 +1396,10 @@ function BookingForm({ activities, staff, fetchAll, locations }: { activities: A
   const { profile } = useAuth();
   const [open, setOpen] = useState(false);
   const [isFree, setIsFree] = useState(false);
-  const [selectedActivityId, setSelectedActivityId] = useState<string>('');
+  const [selectedActivityId, setSelectedActivityId] = useState<string | undefined>(undefined);
   const [offerQuantities, setOfferQuantities] = useState<Record<string, number>>({});
 
-  useEffect(() => { if (!open) { setIsFree(false); setSelectedActivityId(''); setOfferQuantities({}); } }, [open]);
+  useEffect(() => { if (!open) { setIsFree(false); setSelectedActivityId(undefined); setOfferQuantities({}); } }, [open]);
 
   const availableActivities = activities.filter(a => 
     a.status !== 'cancelled' && 
@@ -1452,9 +1452,9 @@ function BookingForm({ activities, staff, fetchAll, locations }: { activities: A
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<Button variant="outline"><Plus className="w-4 h-4 ml-2" /> حجز جديد</Button>} />
-      <DialogContent dir="rtl" className="max-w-lg">
+      <DialogContent dir="rtl" className="max-w-lg max-h-[85vh] flex flex-col">
         <DialogHeader><DialogTitle>تسجيل حجز جديد</DialogTitle></DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+        <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto flex-1 pr-1">
           <div className="space-y-2">
             <Label>النشاط</Label>
             <Select value={selectedActivityId} onValueChange={(v) => { setSelectedActivityId(v); setOfferQuantities({}); }}>
@@ -1583,11 +1583,11 @@ function CostForm({ activities, bookings, costs }: { activities: Activity[], boo
           </Button>
         }
       />
-      <DialogContent dir="rtl">
+      <DialogContent dir="rtl" className="max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>تسجيل مصروف جديد</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto flex-1 pr-1">
           <div className="space-y-2">
             <Label>نوع المصروف</Label>
             <Select onValueChange={(v) => setType(v as any)} defaultValue="general">
@@ -1667,9 +1667,9 @@ function FoundationalCostForm() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<Button className="bg-amber-600 hover:bg-amber-700 text-white"><Plus className="w-4 h-4 ml-2" /> إضافة تكلفة تأسيسية</Button>} />
-      <DialogContent dir="rtl">
+      <DialogContent dir="rtl" className="max-h-[85vh] flex flex-col">
         <DialogHeader><DialogTitle>إضافة تكلفة تأسيسية</DialogTitle></DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto flex-1 pr-1">
           <div className="space-y-2"><Label>البند</Label><Input name="item" required /></div>
           <div className="space-y-2"><Label>المبلغ</Label><Input name="amount" type="number" required /></div>
           <div className="space-y-2"><Label>الشخص الذي دفع</Label><Input name="paidBy" required /></div>
