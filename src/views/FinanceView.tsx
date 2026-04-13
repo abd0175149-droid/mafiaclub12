@@ -210,7 +210,7 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
   const foundationalPagination = usePagination(foundationalCosts, 10);
 
   return (
-    <div className="flex flex-col md:flex-row gap-6 h-[calc(100vh-100px)]">
+    <div className="flex flex-col md:flex-row gap-6 h-[calc(100vh-8rem)]">
       
       {/* Finance Internal Sidebar */}
       <div className="w-full md:w-64 shrink-0 flex flex-col gap-2">
@@ -245,14 +245,14 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
         
         {/* Transactions Tab */}
         {activeTab === 'transactions' && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between border-b pb-4">
-              <h2 className="text-xl font-bold flex items-center gap-2"><DollarSign className="text-emerald-500" /> {isLocationOwner ? 'إيرادات المكان' : 'الحركات المالية وتكاليف الأنشطة'}</h2>
+          <div className="flex flex-col h-full">
+            <div className="flex items-center justify-between border-b pb-3">
+              <h2 className="text-lg font-bold flex items-center gap-2"><DollarSign className="text-emerald-500" /> {isLocationOwner ? 'إيرادات المكان' : 'الحركات المالية وتكاليف الأنشطة'}</h2>
             </div>
             
             {/* Add Cost Form (hidden for location_owner) */}
             {!isLocationOwner && (
-              <form onSubmit={handleAddCost} className="grid grid-cols-1 md:grid-cols-5 gap-4 bg-neutral-50 p-4 rounded-xl border border-neutral-100">
+              <form onSubmit={handleAddCost} className="grid grid-cols-1 md:grid-cols-5 gap-3 bg-neutral-50 p-3 rounded-xl border border-neutral-100 mt-3">
                 <Input placeholder="وصف التكلفة..." value={costItem} onChange={e => setCostItem(e.target.value)} required className="bg-white" />
                 <Input type="number" placeholder="المبلغ (د.أ)" value={costAmount} onChange={e => setCostAmount(e.target.value)} required className="bg-white" />
                 <Input placeholder="دفع بواسطة (اختياري)" value={costPaidBy} onChange={e => setCostPaidBy(e.target.value)} className="bg-white" />
@@ -268,7 +268,7 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
             )}
 
             {/* --- Filters Bar (for all users) --- */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-neutral-50 p-3 rounded-xl border border-neutral-100">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-neutral-50 p-2.5 rounded-xl border border-neutral-100 mt-3">
               <div className="flex items-center gap-2">
                 <Filter className="w-4 h-4 text-neutral-400 shrink-0" />
                 <Select value={filterType} onValueChange={(v) => setFilterType(v as any)}>
@@ -291,9 +291,9 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
               <Input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} className="bg-white h-9 text-xs" placeholder="إلى تاريخ" />
             </div>
 
-            <div className="border rounded-lg max-h-[60vh] overflow-y-auto">
+            <div className="border rounded-lg flex-1 min-h-0 overflow-auto mt-3">
               <Table>
-                <TableHeader className="bg-neutral-50 sticky top-0">
+                <TableHeader className="bg-neutral-50 sticky top-0 z-10">
                   <TableRow>
                      <TableHead className="text-right">التاريخ</TableHead>
                      <TableHead className="text-right">البيان</TableHead>
@@ -356,9 +356,9 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
               <Button type="submit" disabled={isAddingF} className="bg-neutral-900 text-white"><Plus className="w-4 h-4 ml-2" /> أضف مصاريف</Button>
             </form>
 
-            <div className="border rounded-lg max-h-[60vh] overflow-y-auto">
+            <div className="border rounded-lg flex-1 min-h-0 overflow-auto mt-3">
               <Table>
-                <TableHeader className="bg-neutral-50 sticky top-0">
+                <TableHeader className="bg-neutral-50 sticky top-0 z-10">
                    <TableRow>
                      <TableHead className="text-right">التاريخ</TableHead>
                      <TableHead className="text-right">البيان</TableHead>
@@ -460,9 +460,9 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
                   <Badge variant="outline" className="bg-violet-50 text-violet-700 border-violet-200 px-3 py-1 text-sm mb-4">
                     إجمالي المستحقات: {grandTotal} د.أ
                   </Badge>
-                  <div className="border rounded-lg max-h-[60vh] overflow-y-auto">
+                  <div className="border rounded-lg flex-1 min-h-0 overflow-auto">
                     <Table>
-                      <TableHeader className="bg-neutral-50 sticky top-0">
+                      <TableHeader className="bg-neutral-50 sticky top-0 z-10">
                         <TableRow>
                           <TableHead className="text-right">المكان</TableHead>
                           <TableHead className="text-right">التفاصيل</TableHead>

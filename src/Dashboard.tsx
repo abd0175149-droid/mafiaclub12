@@ -182,7 +182,7 @@ export default function Dashboard() {
     if (actFilterDateTo) { const to = new Date(actFilterDateTo); to.setHours(23,59,59,999); result = result.filter(a => new Date(a.date) <= to); }
     return result;
   }, [activities, actFilterStatus, actFilterDateFrom, actFilterDateTo]);
-  const activitiesPagination = usePagination(filteredActivities, 12);
+  const activitiesPagination = usePagination(filteredActivities, 6);
 
   const activeBookingsCount = useMemo(() => bookings.filter(b => {
     const activity = activities.find(a => a.id === b.activityId);
@@ -521,11 +521,11 @@ export default function Dashboard() {
           </div>
 
           <div className={activeTab === 'activities' && !selectedActivity ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
-            <div className="space-y-6">
-              <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-col h-[calc(100vh-8rem)]">
+              <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h2 className="text-2xl font-bold">الأنشطة المجدولة</h2>
-                  <p className="text-neutral-500">إدارة الجلسات والفعاليات</p>
+                  <h2 className="text-xl font-bold">الأنشطة المجدولة</h2>
+                  <p className="text-neutral-500 text-sm">إدارة الجلسات والفعاليات</p>
                 </div>
                 {!isLocationOwner && <ActivityForm locations={locations} fetchAll={fetchAll} />}
               </div>
@@ -553,8 +553,8 @@ export default function Dashboard() {
                   )}
                 </div>
               </div>
-              <div className="flex flex-col gap-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="flex flex-col flex-1 min-h-0 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 flex-1 min-h-0 auto-rows-fr">
                   {filteredActivities.length > 0 ? activitiesPagination.paginatedData.map(activity => (
                     <div key={activity.id}>
                       <ActivityCard 
@@ -567,9 +567,9 @@ export default function Dashboard() {
                       />
                     </div>
                   )) : (
-                    <div className="col-span-full text-center py-16 text-neutral-400">
-                      <CalendarIcon className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                      <p className="text-lg font-medium">لا توجد أنشطة حالياً</p>
+                    <div className="col-span-full text-center py-8 text-neutral-400">
+                      <CalendarIcon className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                      <p className="text-base font-medium">لا توجد أنشطة حالياً</p>
                       <p className="text-sm">ابدأ بإضافة نشاط جديد</p>
                     </div>
                   )}
@@ -582,7 +582,7 @@ export default function Dashboard() {
                   totalItems={filteredActivities.length}
                   onPageChange={activitiesPagination.setCurrentPage}
                   onItemsPerPageChange={activitiesPagination.setItemsPerPage}
-                  itemsPerPageOptions={[6, 12, 24, 48]}
+                  itemsPerPageOptions={[6, 9, 12, 24]}
                   label="نشاط"
                 />
               </div>
