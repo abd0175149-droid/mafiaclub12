@@ -992,6 +992,31 @@ function BookingsTabContent({ bookings, activities, fetchAll, staff, profile, lo
   const [filterActiveUpcoming, setFilterActiveUpcoming] = useState(false);
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
   const [viewingBooking, setViewingBooking] = useState<Booking | null>(null);
+  const [editOfferQuantities, setEditOfferQuantities] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    if (editingBooking && editingBooking.offerItems && editingBooking.offerItems.length > 0) {
+      const qtys: Record<string, number> = {};
+      editingBooking.offerItems.forEach(item => { qtys[item.offerId] = item.quantity; });
+      setEditOfferQuantities(qtys);
+    } else {
+      setEditOfferQuantities({});
+    }
+  }, [editingBooking]);
+
+  const editSelectedActivity = useMemo(() => activities.find(a => a.id === editingBooking?.activityId) || null, [editingBooking, activities]);
+  const editSelectedLocation = useMemo(() => editSelectedActivity?.locationId ? locations.find(l => l.id === editSelectedActivity.locationId) || null : null, [editSelectedActivity, locations]);
+  
+  const editEnabledOffers: LocationOffer[] = useMemo(() => {
+    if (!editSelectedActivity || !editSelectedLocation || !editSelectedActivity.enabledOfferIds?.length) return [];
+    const allOffers = (editSelectedLocation.offers || []).map((o: any, i: number) => normalizeOffer(o, i));
+    return allOffers.filter(o => editSelectedActivity.enabledOfferIds!.includes(o.id));
+  }, [editSelectedActivity, editSelectedLocation]);
+
+  const editHasOffers = editEnabledOffers.length > 0;
+  const editTotalCount = editHasOffers ? Object.values(editOfferQuantities).reduce((s, q) => s + q, 0) : 0;
+  const editTotalAmount = editHasOffers ? editEnabledOffers.reduce((s, o) => s + (o.price * (editOfferQuantities[o.id] || 0)), 0) : 0;
+
 
   // Handle preset filter from KPI card
   useEffect(() => {
@@ -1030,12 +1055,20 @@ function BookingsTabContent({ bookings, activities, fetchAll, staff, profile, lo
     if (!editingBooking) return;
     const fd = new FormData(e.currentTarget);
     try {
+      const offerItems: BookingOfferItem[] = editHasOffers ? editEnabledOffers
+        .filter(o => (editOfferQuantities[o.id] || 0) > 0)
+        .map(o => ({
+          offerId: o.id, offerName: o.description, quantity: editOfferQuantities[o.id] || 0,
+          unitPrice: o.price, clubShare: o.clubShare, venueShare: o.venueShare
+        })) : [];
+
       await apiPut('/bookings/' + editingBooking.id, {
         name: fd.get('name') as string,
         phone: fd.get('phone') as string,
-        count: Number(fd.get('count')),
-        paidAmount: Number(fd.get('paidAmount')),
+        count: editHasOffers ? editTotalCount : Number(fd.get('count')),
+        paidAmount: editHasOffers ? editTotalAmount : Number(fd.get('paidAmount')),
         notes: fd.get('notes') as string,
+        ...(editHasOffers ? { offerItems } : {}),
         ...((!editingBooking.isPaid || !editingBooking.receivedBy || profile?.username === 'admin') && { receivedBy: fd.get('receivedBy') as string })
       });
       setEditingBooking(null);
@@ -1228,16 +1261,43 @@ function BookingsTabContent({ bookings, activities, fetchAll, staff, profile, lo
                 <Label>الاسم</Label>
                 <Input name="name" defaultValue={editingBooking.name} required />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>العدد</Label>
-                  <Input name="count" type="number" defaultValue={editingBooking.count} required min={1} />
+              {editHasOffers ? (
+                <div className="space-y-3 bg-neutral-50 rounded-xl p-4 border border-neutral-100">
+                  <Label className="text-sm font-bold">تعديل العروض والكميات</Label>
+                  {editEnabledOffers.map(offer => (
+                    <div key={offer.id} className="flex items-center justify-between gap-3 bg-white p-2 rounded-lg border border-neutral-100 shadow-sm">
+                      <div className="flex-1">
+                        <Label className="text-sm font-bold">{offer.description}</Label>
+                        <p className="text-xs text-neutral-500">{offer.price} د.أ</p>
+                      </div>
+                      <div className="w-24 shrink-0">
+                        <Input 
+                          type="number" 
+                          min="0" 
+                          value={editOfferQuantities[offer.id] || 0}
+                          onChange={(e) => setEditOfferQuantities(prev => ({...prev, [offer.id]: parseInt(e.target.value) || 0}))}
+                          className="h-8 text-center text-sm font-bold bg-neutral-50" 
+                        />
+                      </div>
+                    </div>
+                  ))}
+                  <div className="bg-emerald-50 rounded-lg p-3 text-sm space-y-1 border border-emerald-100 mt-2">
+                    <div className="flex justify-between text-neutral-700"><span>العدد الإجمالي:</span> <strong>{editTotalCount} شخص</strong></div>
+                    <div className="flex justify-between text-emerald-800"><span>المبلغ (تلقائي):</span> <strong>{editTotalAmount} د.أ</strong></div>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>المبلغ المدفوع</Label>
-                  <Input name="paidAmount" type="number" defaultValue={editingBooking.paidAmount} step="0.01" />
+              ) : (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>العدد</Label>
+                    <Input name="count" type="number" defaultValue={editingBooking.count} required min={1} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>المبلغ المدفوع</Label>
+                    <Input name="paidAmount" type="number" defaultValue={editingBooking.paidAmount} step="0.01" />
+                  </div>
                 </div>
-              </div>
+              )}
               <div className="space-y-2">
                 <Label>رقم الهاتف</Label>
                 <Input name="phone" defaultValue={editingBooking.phone || ''} />
