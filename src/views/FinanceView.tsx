@@ -162,12 +162,12 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
   const revenues = bookings.filter(b => b.isPaid).map(b => ({
     id: `rev-${b.id}`, date: b.createdAt, description: `حجز: ${b.name}`,
     amount: getBookingDisplayAmount(b), type: 'revenue' as const, reference: activities.find(a => a.id === b.activityId)?.name || 'غير معروف',
-    rawId: b.id
+    rawId: b.id, activityId: b.activityId
   }));
   const expenses = isLocationOwner ? [] : costs.map(c => ({
     id: `exp-${c.id}`, date: c.date, description: c.item,
     amount: c.amount, type: 'expense' as const, reference: c.type === 'activity' ? activities.find(a => a.id === c.activityId)?.name : 'تكاليف عامة',
-    rawId: c.id
+    rawId: c.id, activityId: c.activityId
   }));
   const allTransactions = [...revenues, ...expenses].sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
 
@@ -313,7 +313,7 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
                        )}
                        <TableCell className="font-bold">{t.amount} د.أ</TableCell>
                        <TableCell>
-                         {isAdmin && t.type === 'expense' && (
+                         {isAdmin && t.type === 'expense' && !activities.find(a => a.id === (t as any).activityId)?.isLocked && (
                             <Button variant="ghost" size="icon" className="text-rose-500 hover:bg-rose-50" onClick={(e) => { e.stopPropagation(); handleDeleteCost(t.rawId); }}>
                               <Trash2 className="w-4 h-4" />
                             </Button>

@@ -14,6 +14,8 @@ interface ActivityDetailsProps {
   bookings: Booking[];
   costs: Cost[];
   onBack: () => void;
+  isAdmin?: boolean;
+  onLockToggle?: () => void;
 }
 
 const safeDate = (date: any) => {
@@ -39,9 +41,10 @@ const STATUS_COLORS: Record<string, string> = {
   cancelled: 'bg-rose-50 text-rose-700 border-rose-200'
 };
 
+import { Lock, Unlock } from 'lucide-react';
 import DriveFolderBrowser from '@/components/DriveFolderBrowser';
 
-export default function ActivityDetails({ activity, location, bookings, costs, onBack }: ActivityDetailsProps) {
+export default function ActivityDetails({ activity, location, bookings, costs, onBack, isAdmin, onLockToggle }: ActivityDetailsProps) {
   const activityBookings = bookings.filter(b => b.activityId === activity.id);
   const activityCosts = costs.filter(c => c.activityId === activity.id);
 
@@ -80,11 +83,32 @@ export default function ActivityDetails({ activity, location, bookings, costs, o
             <ArrowRight className="w-5 h-5" />
           </Button>
           <div className="flex-1">
-            <div className="flex items-center gap-3 mb-1 flex-wrap">
-              <h1 className="text-2xl font-bold text-neutral-900">{activity.name}</h1>
-              <Badge variant="outline" className={`${STATUS_COLORS[activity.status]} text-xs px-2.5 py-0.5`}>
-                {STATUS_LABELS[activity.status]}
-              </Badge>
+            <div className="flex items-center gap-3 mb-1 flex-wrap justify-between pr-4">
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl font-bold text-neutral-900">{activity.name}</h1>
+                <Badge variant="outline" className={`${STATUS_COLORS[activity.status]} text-xs px-2.5 py-0.5`}>
+                  {STATUS_LABELS[activity.status]}
+                </Badge>
+                {activity.isLocked && (
+                  <Badge variant="default" className="bg-rose-500 hover:bg-rose-600 text-white flex items-center gap-1">
+                    <Lock className="w-3 h-3" /> مقفول إدارياً
+                  </Badge>
+                )}
+              </div>
+              {isAdmin && (
+                <Button 
+                  size="sm" 
+                  variant={activity.isLocked ? "outline" : "destructive"} 
+                  className={activity.isLocked ? "border-rose-200 text-rose-600 hover:bg-rose-50" : ""}
+                  onClick={onLockToggle}
+                >
+                  {activity.isLocked ? (
+                    <><Unlock className="w-4 h-4 ml-1.5" /> فك القفل الإداري</>
+                  ) : (
+                    <><Lock className="w-4 h-4 ml-1.5" /> قفل النشاط نهائياً</>
+                  )}
+                </Button>
+              )}
             </div>
             <div className="flex items-center gap-4 text-sm text-neutral-500 flex-wrap">
               <span className="flex items-center gap-1.5">
@@ -104,6 +128,16 @@ export default function ActivityDetails({ activity, location, bookings, costs, o
             </div>
             {activity.description && (
               <p className="text-sm text-neutral-600 mt-2 max-w-2xl leading-relaxed">{activity.description}</p>
+            )}
+            
+            {activity.isLocked && (
+              <div className="mt-4 p-3 bg-rose-50 border border-rose-200 rounded-lg flex items-start gap-3">
+                <Lock className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="font-bold text-rose-800 text-sm">هذا النشاط مقفول</h4>
+                  <p className="text-xs text-rose-600 mt-1">يمنع إجراء أي تعديلات مالية أو إدارية على هذا النشاط بسبب إغلاق السجل الخاص به. فقط المدير العام بإمكانه تغيير حالة القفل.</p>
+                </div>
+              </div>
             )}
           </div>
         </div>

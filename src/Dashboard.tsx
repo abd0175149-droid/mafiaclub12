@@ -744,6 +744,17 @@ export default function Dashboard() {
                 bookings={bookings}
                 costs={costs}
                 onBack={() => setSelectedActivity(null)}
+                isAdmin={isAdmin}
+                onLockToggle={async () => {
+                  try {
+                    await apiPut('/activities/' + selectedActivity.id, { isLocked: !selectedActivity.isLocked });
+                    toast.success(selectedActivity.isLocked ? 'تم فك قفل النشاط' : 'تم قفل النشاط بنجاح');
+                    fetchAll();
+                    setSelectedActivity({ ...selectedActivity, isLocked: !selectedActivity.isLocked });
+                  } catch (err: any) {
+                    toast.error(err.message || 'حدث خطأ أثناء تغيير حالة القفل');
+                  }
+                }}
               />
             </div>
           )}
@@ -900,10 +911,15 @@ const ActivityCard: React.FC<ActivityCardProps> = ({ activity, stats, onDelete, 
     <Card className="border-none shadow-sm hover:shadow-md transition-shadow">
       <CardHeader className="pb-1 pt-3 px-4">
         <div className="flex justify-between items-start">
-          <Badge variant="secondary" className={STATUS_COLORS[activity.status]}>
-            {STATUS_LABELS[activity.status]}
-          </Badge>
-          <p className="text-xs text-neutral-500">{format(safeDate(activity.date)!, 'yyyy/MM/dd')}</p>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <Badge variant="secondary" className={STATUS_COLORS[activity.status]}>
+              {STATUS_LABELS[activity.status]}
+            </Badge>
+            {activity.isLocked && (
+              <Badge variant="default" className="bg-rose-500 text-white text-[10px] px-1.5 py-0">مقفول</Badge>
+            )}
+          </div>
+          <p className="text-xs text-neutral-500 shrink-0">{format(safeDate(activity.date)!, 'yyyy/MM/dd')}</p>
         </div>
         <CardTitle className="mt-1 text-sm">{activity.name}</CardTitle>
         <CardDescription className="line-clamp-1 text-xs">{activity.description}</CardDescription>
@@ -927,7 +943,7 @@ const ActivityCard: React.FC<ActivityCardProps> = ({ activity, stats, onDelete, 
         </div>
         {/* Status + View + Delete */}
         <div className="flex items-center gap-2 pt-1.5 border-t border-neutral-100">
-          {onStatusChange ? (
+          {!activity.isLocked && onStatusChange ? (
             <Select
               value={activity.status}
               onValueChange={async (v) => { try { await apiPut('/activities/' + activity.id, { status: v }); if (onStatusChange) onStatusChange(); } catch (e) { console.error(e); } }}
@@ -946,7 +962,7 @@ const ActivityCard: React.FC<ActivityCardProps> = ({ activity, stats, onDelete, 
             <Badge variant="outline" className={`${STATUS_COLORS[activity.status]} flex-1 justify-center py-1.5`}>{STATUS_LABELS[activity.status]}</Badge>
           )}
           <div className="flex items-center gap-1">
-            {onEdit && activity.status === 'planned' && (
+            {!activity.isLocked && onEdit && activity.status === 'planned' && (
               <button type="button" title="تعديل النشاط" className="inline-flex items-center justify-center text-amber-500 h-7 w-7 rounded-md hover:bg-amber-50 transition-colors" onClick={() => { if (onEdit) onEdit(); }}>
                 <Pencil className="w-4 h-4" />
               </button>
@@ -956,7 +972,7 @@ const ActivityCard: React.FC<ActivityCardProps> = ({ activity, stats, onDelete, 
                 <Info className="w-4 h-4" />
               </button>
             )}
-            {onDelete && (
+            {!activity.isLocked && onDelete && (
               <button type="button" title="حذف" className="inline-flex items-center justify-center text-rose-500 h-7 w-7 rounded-md hover:bg-rose-50 transition-colors" onClick={() => { if (onDelete) onDelete(); }}>
                 <Trash2 className="w-4 h-4" />
               </button>
@@ -1094,7 +1110,9 @@ function BookingsTabContent({ bookings, activities, fetchAll, staff, profile, lo
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredBookings.length > 0 ? bookingsPagination.paginatedData.map(booking => (
+            {filteredBookings.length > 0 ? bookingsPagination.paginatedData.map(booking => {
+              const isActivityLocked = activities.find(a => a.id === booking.activityId)?.isLocked;
+              return (
               <TableRow key={booking.id} id={'glow-booking-' + booking.id}>
                 <TableCell className="font-medium text-right">{booking.name}</TableCell>
                 <TableCell className="text-right">{activities.find(a => a.id === booking.activityId)?.name || 'غير معروف'}</TableCell>
@@ -1115,12 +1133,12 @@ function BookingsTabContent({ bookings, activities, fetchAll, staff, profile, lo
                     <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-600" title="عرض التفاصيل" onClick={() => setViewingBooking(booking)}>
                       <Eye className="w-3.5 h-3.5" />
                     </Button>
-                    {(!booking.isPaid || profile?.username === 'admin') && (
+                    {!isActivityLocked && (!booking.isPaid || profile?.username === 'admin') && (
                       <Button size="icon" variant="ghost" className="h-8 w-8" title="تعديل" onClick={() => setEditingBooking(booking)}>
                         <Pencil className="w-3.5 h-3.5" />
                       </Button>
                     )}
-                    {!booking.isPaid && !booking.isFree && (
+                    {!isActivityLocked && !booking.isPaid && !booking.isFree && (
                       <Button size="sm" variant="outline" className="h-8 text-xs" onClick={async () => {
                         const activity = activities.find(a => a.id === booking.activityId);
                         const basePrice = activity?.basePrice || 0;
@@ -1164,21 +1182,23 @@ function BookingsTabContent({ bookings, activities, fetchAll, staff, profile, lo
                         }
                       }}>دفع</Button>
                     )}
-                    <Button size="icon" variant="ghost" className="text-rose-500 h-8 w-8" onClick={async () => {
-                      const r = await Swal.fire({ title: 'حذف الحجز؟', text: 'هل تريد حذف هذا الحجز؟', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', cancelButtonColor: '#6b7280', confirmButtonText: 'احذف', cancelButtonText: 'إلغاء', reverseButtons: true });
-                      if (!r.isConfirmed) return;
-                      try {
-                        await apiDelete('/bookings/' + booking.id);
-                        Swal.fire({ title: 'تم!', text: 'تم حذف الحجز', icon: 'success', timer: 1500, showConfirmButton: false });
-                        fetchAll();
-                      } catch (err: any) { Swal.fire({ title: 'خطأ', text: err.message, icon: 'error' }); }
-                    }}>
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
+                    {!isActivityLocked && (
+                      <Button size="icon" variant="ghost" className="text-rose-500 h-8 w-8" onClick={async () => {
+                        const r = await Swal.fire({ title: 'حذف الحجز؟', text: 'هل تريد حذف هذا الحجز؟', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', cancelButtonColor: '#6b7280', confirmButtonText: 'احذف', cancelButtonText: 'إلغاء', reverseButtons: true });
+                        if (!r.isConfirmed) return;
+                        try {
+                          await apiDelete('/bookings/' + booking.id);
+                          Swal.fire({ title: 'تم!', text: 'تم حذف الحجز', icon: 'success', timer: 1500, showConfirmButton: false });
+                          fetchAll();
+                        } catch (err: any) { Swal.fire({ title: 'خطأ', text: err.message, icon: 'error' }); }
+                      }}>
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    )}
                   </div>
                 </TableCell>
               </TableRow>
-            )) : (
+            )}) : (
               <TableRow>
                 <TableCell colSpan={7} className="text-center py-8 text-neutral-400">
                   {searchQuery || filterActivity !== 'all' || filterStatus !== 'all' ? 'لا توجد نتائج مطابقة' : 'لا توجد حجوزات بعد'}
@@ -1473,6 +1493,7 @@ function BookingForm({ activities, staff, fetchAll, locations }: { activities: A
   useEffect(() => { if (!open) { setIsFree(false); setIsPaid(false); setSelectedActivityId(undefined); setOfferQuantities({}); } }, [open]);
 
   const availableActivities = activities.filter(a => 
+    !a.isLocked &&
     a.status !== 'cancelled' && 
     (a.status !== 'completed' || profile?.username === 'admin')
   );
@@ -1696,8 +1717,8 @@ function CostForm({ activities, bookings, costs }: { activities: Activity[], boo
                   <SelectValue placeholder="اختر النشاط" />
                 </SelectTrigger>
                 <SelectContent>
-                  {activities.map(a => (
-                    <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                  {activities.filter(a => !a.isLocked).map(a => (
+                    <SelectItem key={a.id} value={a.id.toString()}>{a.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

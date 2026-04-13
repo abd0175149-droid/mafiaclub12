@@ -24,6 +24,7 @@ export interface Activity {
   locationId?: string | number | null;
   driveLink?: string;
   enabledOfferIds?: string[];
+  isLocked?: boolean;
   createdAt: string;
 }
 
