@@ -652,7 +652,7 @@ export default function Dashboard() {
           </div>
 
           <div className={activeTab === 'bookings' && !selectedActivity ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
-            <BookingsTabContent bookings={bookings} activities={activities} fetchAll={fetchAll} staff={staff} profile={profile} />
+            <BookingsTabContent bookings={bookings} activities={activities} fetchAll={fetchAll} staff={staff} profile={profile} locations={locations} />
           </div>
 
           <div className={activeTab === 'finances' && !selectedActivity ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
@@ -940,7 +940,7 @@ const ActivityCard: React.FC<ActivityCardProps> = ({ activity, stats, onDelete, 
 }
 
 // BookingsTabContent with search, filter, edit [BL-05, F-03, F-06, UX-02, UX-03]
-function BookingsTabContent({ bookings, activities, fetchAll, staff, profile }: { bookings: Booking[], activities: Activity[], fetchAll: () => void, staff: StaffMember[], profile: any }) {
+function BookingsTabContent({ bookings, activities, fetchAll, staff, profile, locations }: { bookings: Booking[], activities: Activity[], fetchAll: () => void, staff: StaffMember[], profile: any, locations: Location[] }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterActivity, setFilterActivity] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
