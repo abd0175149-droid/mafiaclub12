@@ -77,14 +77,22 @@ export default function Dashboard() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [locations, setLocations] = useState<Location[]>([]);
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState(() => {
+    const saved = localStorage.getItem('mafia_active_tab');
+    return saved || 'activities';
+  });
   const [showCharts, setShowCharts] = useState(false);
   const [bookingsFilterPreset, setBookingsFilterPreset] = useState<'all' | 'active_upcoming'>('all');
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
+
+  // Persist active tab to localStorage
+  useEffect(() => {
+    localStorage.setItem('mafia_active_tab', activeTab);
+  }, [activeTab]);
   const [editingActivityMain, setEditingActivityMain] = useState<Activity | null>(null);
   const [loading, setLoading] = useState(true);
   // Activity filters
-  const [actFilterStatus, setActFilterStatus] = useState<string>('all');
+  const [actFilterStatus, setActFilterStatus] = useState<string>('planned');
   const [actFilterDateFrom, setActFilterDateFrom] = useState('');
   const [actFilterDateTo, setActFilterDateTo] = useState('');
 
@@ -306,7 +314,7 @@ export default function Dashboard() {
             return (
               <button
                 key={tc.id}
-                onClick={() => { setActiveTab(tc.id); setIsMobileMenuOpen(false); }}
+                onClick={() => { setActiveTab(tc.id); setSelectedActivity(null); setIsMobileMenuOpen(false); }}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === tc.id ? 'bg-neutral-800 text-white shadow-md border border-neutral-700/50' : 'text-neutral-400 hover:bg-neutral-800/50 hover:text-white'}`}
               >
                 <tc.icon className="w-5 h-5 flex-shrink-0" />
@@ -316,7 +324,7 @@ export default function Dashboard() {
           })}
           {isAdmin && (
             <button
-              onClick={() => { setActiveTab('users'); setIsMobileMenuOpen(false); }}
+              onClick={() => { setActiveTab('users'); setSelectedActivity(null); setIsMobileMenuOpen(false); }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'users' ? 'bg-neutral-800 text-white shadow-md border border-neutral-700/50' : 'text-neutral-400 hover:bg-neutral-800/50 hover:text-white'}`}
             >
               <Shield className="w-5 h-5 flex-shrink-0 text-emerald-400" />
@@ -389,7 +397,16 @@ export default function Dashboard() {
         <div className="p-4 md:p-8 max-w-[1600px] mx-auto space-y-8">
 
           <div className={activeTab === 'overview' && !selectedActivity ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
-            <h2 className="text-2xl font-bold mb-6">نظرة عامة والتحليلات</h2>
+            <button
+              onClick={() => setShowCharts(!showCharts)}
+              className="flex items-center gap-3 text-2xl font-bold mb-4 hover:text-neutral-600 transition-colors w-full text-right"
+            >
+              نظرة عامة والتحليلات
+              {showCharts ? <ChevronUp className="w-5 h-5 text-neutral-400" /> : <ChevronDown className="w-5 h-5 text-neutral-400" />}
+            </button>
+
+            {showCharts && (
+            <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {settings?.dashboardLayout.includes('revenue') && (
                 <KPICard title="إجمالي الإيرادات" value={`${totalRevenue.toLocaleString()} د.أ`} icon={<TrendingUp className="text-emerald-500" />} subtitle={`من ${bookings.length} حجز`} />
@@ -410,21 +427,6 @@ export default function Dashboard() {
                 />
               )}
             </div>
-
-            {/* Collapsible Charts Section */}
-            <div className="mt-6">
-              <button
-                onClick={() => setShowCharts(!showCharts)}
-                className="flex items-center gap-2 text-sm font-bold text-neutral-600 hover:text-neutral-900 transition-colors px-1 py-2 rounded-lg hover:bg-neutral-100"
-              >
-                <BarChart3 className="w-4 h-4" />
-                الإحصائيات والرسوم البيانية
-                {showCharts ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-              </button>
-            </div>
-
-            {showCharts && (
-            <>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
               {/* Upcoming Activities */}
@@ -551,7 +553,10 @@ export default function Dashboard() {
                   <h2 className="text-xl font-bold">الأنشطة المجدولة</h2>
                   <p className="text-neutral-500 text-sm">إدارة الجلسات والفعاليات</p>
                 </div>
-                {!isLocationOwner && <ActivityForm locations={locations} fetchAll={fetchAll} />}
+                <div className="flex items-center gap-2">
+                  {!isLocationOwner && <BookingForm activities={activities} staff={staff} fetchAll={fetchAll} locations={locations} />}
+                  {!isLocationOwner && <ActivityForm locations={locations} fetchAll={fetchAll} />}
+                </div>
               </div>
               {/* Activity Filters */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-2 bg-neutral-50 p-2 rounded-xl border border-neutral-100 mb-3">
@@ -1045,7 +1050,9 @@ function BookingsTabContent({ bookings, activities, fetchAll, staff, profile, lo
           />
           <Select value={filterActivity} onValueChange={setFilterActivity}>
             <SelectTrigger className="w-48">
-              <SelectValue placeholder="كل الأنشطة" />
+              <SelectValue placeholder="كل الأنشطة">
+                {filterActivity === 'all' ? 'كل الأنشطة' : (activities.find(a => a.id === filterActivity)?.name || filterActivity)}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">كل الأنشطة</SelectItem>
@@ -1547,23 +1554,23 @@ function BookingForm({ activities, staff, fetchAll, locations }: { activities: A
           ) : (
             <div className="space-y-2"><Label>عدد الأشخاص</Label><Input name="count" type="number" defaultValue="1" required /></div>
           )}
-          <div className="space-y-2">
-            <Label>نوع الحجز</Label>
-            <Select value={isFree ? 'true' : 'false'} onValueChange={(v) => setIsFree(v === 'true')}>
-              <SelectTrigger>
-                <SelectValue placeholder="نوع الحجز">
-                  {isFree ? 'مجاني (ضيف)' : 'مدفوع'}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="false">مدفوع</SelectItem>
-                <SelectItem value="true">مجاني (ضيف)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          {!isFree && (
-            <>
-              <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-2">
+              <Label>نوع الحجز</Label>
+              <Select value={isFree ? 'true' : 'false'} onValueChange={(v) => setIsFree(v === 'true')}>
+                <SelectTrigger>
+                  <SelectValue placeholder="نوع الحجز">
+                    {isFree ? 'مجاني (ضيف)' : 'مدفوع'}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="false">مدفوع</SelectItem>
+                  <SelectItem value="true">مجاني (ضيف)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {!isFree && (
+              <>
                 <div className="space-y-2">
                   <Label>حالة الدفع</Label>
                   <Select value={isPaid ? 'true' : 'false'} onValueChange={(v) => setIsPaid(v === 'true')}>
@@ -1576,16 +1583,18 @@ function BookingForm({ activities, staff, fetchAll, locations }: { activities: A
                   </Select>
                   <input type="hidden" name="isPaid" value={isPaid ? 'true' : 'false'} />
                 </div>
-                {!hasOffers && (<div className="space-y-2"><Label>المبلغ المدفوع</Label><Input name="paidAmount" type="number" placeholder="0" /></div>)}
-              </div>
-              <div className="space-y-2">
-                <Label>الموظف المستلم</Label>
-                <Select name="receivedBy">
-                  <SelectTrigger><SelectValue placeholder="اختر الموظف" /></SelectTrigger>
-                  <SelectContent>{staff.map(s => <SelectItem key={s.id || s.displayName} value={s.displayName}>{s.displayName}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-            </>
+                <div className="space-y-2">
+                  <Label>الموظف المستلم</Label>
+                  <Select name="receivedBy">
+                    <SelectTrigger><SelectValue placeholder="اختر الموظف" /></SelectTrigger>
+                    <SelectContent>{staff.map(s => <SelectItem key={s.id || s.displayName} value={s.displayName}>{s.displayName}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
+          </div>
+          {!isFree && !hasOffers && (
+            <div className="space-y-2"><Label>المبلغ المدفوع</Label><Input name="paidAmount" type="number" placeholder="0" /></div>
           )}
           <div className="space-y-2"><Label>ملاحظات</Label><Input name="notes" /></div>
           <DialogFooter><Button type="submit" className="w-full">تأكيد الحجز</Button></DialogFooter>
