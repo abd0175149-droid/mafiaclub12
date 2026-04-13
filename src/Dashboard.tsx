@@ -325,7 +325,7 @@ export default function Dashboard() {
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col overflow-hidden w-full min-w-0 bg-neutral-50/50 relative">
+      <main className="flex-1 overflow-y-auto w-full min-w-0 bg-neutral-50/50 relative">
         {/* Top Navbar */}
         <header className="bg-white border-b border-neutral-200 p-4 sticky top-0 z-30 shadow-sm flex items-center justify-between">
           <div className="flex items-center gap-4 w-full justify-between md:justify-end flex-row-reverse md:flex-row">
@@ -384,7 +384,7 @@ export default function Dashboard() {
           </div>
         </header>
 
-        <div className="p-4 md:p-6 max-w-[1600px] mx-auto flex flex-col gap-6 flex-1 min-h-0 overflow-y-auto">
+        <div className="p-4 md:p-8 max-w-[1600px] mx-auto space-y-8">
 
           <div className={activeTab === 'overview' && !selectedActivity ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
             <h2 className="text-2xl font-bold mb-6">نظرة عامة والتحليلات</h2>
@@ -520,9 +520,9 @@ export default function Dashboard() {
             </Card>
           </div>
 
-          <div className={activeTab === 'activities' && !selectedActivity ? 'flex flex-col flex-1 min-h-0 animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
-            <div className="flex flex-col flex-1 min-h-0 gap-4">
-              <div className="flex items-center justify-between shrink-0">
+          <div className={activeTab === 'activities' && !selectedActivity ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
+            <div className="space-y-6">
+              <div className="flex items-center justify-between mb-6">
                 <div>
                   <h2 className="text-2xl font-bold">الأنشطة المجدولة</h2>
                   <p className="text-neutral-500">إدارة الجلسات والفعاليات</p>
@@ -530,7 +530,7 @@ export default function Dashboard() {
                 {!isLocationOwner && <ActivityForm locations={locations} fetchAll={fetchAll} />}
               </div>
               {/* Activity Filters */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-neutral-50 p-3 rounded-xl border border-neutral-100 shrink-0">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-neutral-50 p-3 rounded-xl border border-neutral-100">
                 <div className="flex items-center gap-2">
                   <Filter className="w-4 h-4 text-neutral-400 shrink-0" />
                   <Select value={actFilterStatus} onValueChange={setActFilterStatus}>
@@ -553,8 +553,8 @@ export default function Dashboard() {
                   )}
                 </div>
               </div>
-              <div className="flex flex-col flex-1 min-h-0 gap-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 flex-1 min-h-0 auto-rows-min overflow-y-auto">
+              <div className="flex flex-col gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {filteredActivities.length > 0 ? activitiesPagination.paginatedData.map(activity => (
                     <div key={activity.id}>
                       <ActivityCard 
@@ -611,7 +611,7 @@ export default function Dashboard() {
                       toast.success('تم تحديث النشاط بنجاح');
                       fetchAll();
                     } catch (err: any) { toast.error(err.message || 'حدث خطأ عند التحديث'); }
-                  }} className="space-y-4">
+                  }} className="space-y-4 max-h-[80vh] overflow-y-auto px-1 pb-4">
                     <div className="space-y-2">
                       <Label>اسم النشاط</Label>
                       <Input name="name" required defaultValue={editingActivityMain.name} />
@@ -1144,7 +1144,7 @@ function BookingsTabContent({ bookings, activities, fetchAll, staff, profile, lo
         <DialogContent dir="rtl" className="max-w-md max-h-[85vh] flex flex-col">
           <DialogHeader><DialogTitle>تعديل الحجز</DialogTitle></DialogHeader>
           {editingBooking && (
-            <form onSubmit={handleEditSave} className="space-y-4">
+            <form onSubmit={handleEditSave} className="space-y-4 max-h-[80vh] overflow-y-auto px-1 pb-4">
               <div className="space-y-2">
                 <Label>الاسم</Label>
                 <Input name="name" defaultValue={editingBooking.name} required />
@@ -1192,7 +1192,7 @@ function BookingsTabContent({ bookings, activities, fetchAll, staff, profile, lo
         <DialogContent dir="rtl" className="max-w-md">
           <DialogHeader><DialogTitle>تفاصيل الحجز</DialogTitle></DialogHeader>
           {viewingBooking && (
-            <div className="space-y-4">
+            <div className="space-y-4 max-h-[80vh] overflow-y-auto px-1 pb-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-neutral-50 rounded-lg p-3">
                   <p className="text-[10px] text-neutral-500 uppercase font-bold mb-1">الاسم</p>
@@ -1327,7 +1327,7 @@ function ActivityForm({ locations, fetchAll }: { locations: Location[], fetchAll
         <DialogHeader>
           <DialogTitle>إضافة نشاط جديد</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 max-h-[80vh] overflow-y-auto px-1 pb-4">
           <div className="space-y-2">
             <Label>التاريخ</Label>
             <Input name="date" type="datetime-local" required />
@@ -1460,7 +1460,7 @@ function BookingForm({ activities, staff, fetchAll, locations }: { activities: A
       <DialogTrigger render={<Button variant="outline"><Plus className="w-4 h-4 ml-2" /> حجز جديد</Button>} />
       <DialogContent dir="rtl" className="max-w-lg">
         <DialogHeader><DialogTitle>تسجيل حجز جديد</DialogTitle></DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 max-h-[80vh] overflow-y-auto px-1 pb-4">
           <div className="space-y-2">
             <Label>النشاط</Label>
             <Select value={selectedActivityId} onValueChange={(v) => { setSelectedActivityId(v); setOfferQuantities({}); }}>
@@ -1606,7 +1606,7 @@ function CostForm({ activities, bookings, costs }: { activities: Activity[], boo
         <DialogHeader>
           <DialogTitle>تسجيل مصروف جديد</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 max-h-[80vh] overflow-y-auto px-1 pb-4">
           <div className="space-y-2">
             <Label>نوع المصروف</Label>
             <Select onValueChange={(v) => setType(v as any)} defaultValue="general">
@@ -1688,7 +1688,7 @@ function FoundationalCostForm() {
       <DialogTrigger render={<Button className="bg-amber-600 hover:bg-amber-700 text-white"><Plus className="w-4 h-4 ml-2" /> إضافة تكلفة تأسيسية</Button>} />
       <DialogContent dir="rtl">
         <DialogHeader><DialogTitle>إضافة تكلفة تأسيسية</DialogTitle></DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 max-h-[80vh] overflow-y-auto px-1 pb-4">
           <div className="space-y-2"><Label>البند</Label><Input name="item" required /></div>
           <div className="space-y-2"><Label>المبلغ</Label><Input name="amount" type="number" required /></div>
           <div className="space-y-2"><Label>الشخص الذي دفع</Label><Input name="paidBy" required /></div>

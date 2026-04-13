@@ -176,7 +176,7 @@ export default function LocationsView() {
             <DialogHeader>
               <DialogTitle>{editingLoc ? 'تعديل بيانات المكان' : 'إضافة مكان جديد'}</DialogTitle>
             </DialogHeader>
-            <div className="space-y-6 py-4">
+            <div className="space-y-6 py-4 max-h-[80vh] overflow-y-auto px-1 pb-4">
               <div className="space-y-2">
                 <Label>اسم المكان (الكافيه / القهوة) <span className="text-red-500">*</span></Label>
                 <Input value={name} onChange={e => setName(e.target.value)} placeholder="مثال: The Coffee Bean" />
