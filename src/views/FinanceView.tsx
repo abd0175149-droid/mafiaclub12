@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Activity, Booking, Cost, FoundationalCost, StaffMember } from '../types';
+import { Activity, Booking, Cost, FoundationalCost, StaffMember, Location, normalizeOffer, BookingOfferItem } from '../types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -7,7 +7,7 @@ import { PaginationControls, usePagination } from '@/components/Pagination';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Trash2, DollarSign, Plus, ArrowLeftRight, Building2, Filter } from 'lucide-react';
+import { Trash2, DollarSign, Plus, ArrowLeftRight, Building2, Filter, MapPin } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAuth } from '../AuthContext';
 import { apiPost, apiDelete, apiPut } from '../lib/api';
@@ -21,13 +21,14 @@ interface FinanceViewProps {
   foundationalCosts: FoundationalCost[];
   fetchData: () => void;
   staff: StaffMember[];
+  locations: Location[];
 }
 
-export default function FinanceView({ activities, bookings, costs, foundationalCosts, fetchData, staff }: FinanceViewProps) {
+export default function FinanceView({ activities, bookings, costs, foundationalCosts, fetchData, staff, locations }: FinanceViewProps) {
   const { profile } = useAuth();
   const isAdmin = profile?.role === 'admin';
   const isLocationOwner = profile?.role === 'location_owner';
-  const [activeTab, setActiveTab] = useState<'transactions' | 'foundational'>('transactions');
+  const [activeTab, setActiveTab] = useState<'transactions' | 'foundational' | 'venue_dues'>('transactions');
 
   // Transactions State
   const [costItem, setCostItem] = useState('');
@@ -141,10 +142,26 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
 
   const totalFoundational = foundationalCosts.reduce((s, c) => s + c.amount, 0);
 
+  // Helper: get club or venue revenue from booking
+  const getBookingDisplayAmount = (b: Booking) => {
+    if (isLocationOwner) {
+      // Location owner sees their venue share only
+      if (b.offerItems && b.offerItems.length > 0) {
+        return b.offerItems.reduce((s, item) => s + (item.venueShare * item.quantity), 0);
+      }
+      return 0; // Legacy bookings without offers: location owner sees 0
+    }
+    // Admin sees club share
+    if (b.offerItems && b.offerItems.length > 0) {
+      return b.offerItems.reduce((s, item) => s + (item.clubShare * item.quantity), 0);
+    }
+    return b.paidAmount;
+  };
+
   // Compile Transactions
   const revenues = bookings.filter(b => b.isPaid).map(b => ({
     id: `rev-${b.id}`, date: b.createdAt, description: `حجز: ${b.name}`,
-    amount: b.paidAmount, type: 'revenue' as const, reference: activities.find(a => a.id === b.activityId)?.name || 'غير معروف',
+    amount: getBookingDisplayAmount(b), type: 'revenue' as const, reference: activities.find(a => a.id === b.activityId)?.name || 'غير معروف',
     rawId: b.id
   }));
   const expenses = isLocationOwner ? [] : costs.map(c => ({
@@ -211,6 +228,15 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
           >
             <Building2 className="w-5 h-5 flex-shrink-0" />
             <span>مصاريف التأسيس</span>
+          </button>
+        )}
+        {!isLocationOwner && (
+          <button 
+            onClick={() => setActiveTab('venue_dues')}
+            className={`flex items-center gap-3 p-4 rounded-xl text-right transition-all font-bold ${activeTab === 'venue_dues' ? 'bg-neutral-900 text-white shadow-lg' : 'bg-white hover:bg-neutral-100 text-neutral-600'}`}
+          >
+            <MapPin className="w-5 h-5 flex-shrink-0" />
+            <span>مستحقات الأماكن</span>
           </button>
         )}
       </div>
@@ -390,6 +416,88 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
               onItemsPerPageChange={foundationalPagination.setItemsPerPage}
               label="مصروف"
             />
+          </div>
+        )}
+
+        {/* Venue Dues Tab */}
+        {activeTab === 'venue_dues' && !isLocationOwner && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between border-b pb-4">
+              <h2 className="text-xl font-bold flex items-center gap-2"><MapPin className="text-violet-500" /> مستحقات الأماكن</h2>
+            </div>
+            
+            {(() => {
+              // Calculate venue dues per location
+              const venueDuesMap = new Map<string | number, { locationName: string; totalDue: number; activities: { activityName: string; amount: number }[] }>();
+              
+              bookings.filter(b => b.isPaid && b.offerItems && b.offerItems.length > 0).forEach(b => {
+                const activity = activities.find(a => a.id === b.activityId);
+                if (!activity?.locationId) return;
+                const loc = locations.find(l => l.id === activity.locationId);
+                if (!loc) return;
+                
+                const venueAmount = b.offerItems!.reduce((s, item) => s + (item.venueShare * item.quantity), 0);
+                if (venueAmount <= 0) return;
+                
+                if (!venueDuesMap.has(loc.id)) {
+                  venueDuesMap.set(loc.id, { locationName: loc.name, totalDue: 0, activities: [] });
+                }
+                const entry = venueDuesMap.get(loc.id)!;
+                entry.totalDue += venueAmount;
+                const existingActivity = entry.activities.find(a => a.activityName === (activity.name || 'غير معروف'));
+                if (existingActivity) {
+                  existingActivity.amount += venueAmount;
+                } else {
+                  entry.activities.push({ activityName: activity.name || 'غير معروف', amount: venueAmount });
+                }
+              });
+
+              const duesArray = Array.from(venueDuesMap.values()).sort((a, b) => b.totalDue - a.totalDue);
+              const grandTotal = duesArray.reduce((s, d) => s + d.totalDue, 0);
+
+              return (
+                <>
+                  <Badge variant="outline" className="bg-violet-50 text-violet-700 border-violet-200 px-3 py-1 text-sm mb-4">
+                    إجمالي المستحقات: {grandTotal} د.أ
+                  </Badge>
+                  <div className="border rounded-lg max-h-[60vh] overflow-y-auto">
+                    <Table>
+                      <TableHeader className="bg-neutral-50 sticky top-0">
+                        <TableRow>
+                          <TableHead className="text-right">المكان</TableHead>
+                          <TableHead className="text-right">التفاصيل</TableHead>
+                          <TableHead className="text-right">المبلغ المستحق</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {duesArray.map((due) => (
+                          <TableRow key={due.locationName}>
+                            <TableCell className="font-bold">{due.locationName}</TableCell>
+                            <TableCell>
+                              <div className="space-y-1">
+                                {due.activities.map((act, i) => (
+                                  <div key={i} className="text-xs text-neutral-500">
+                                    {act.activityName}: <span className="text-neutral-700 font-medium">{act.amount} د.أ</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </TableCell>
+                            <TableCell className="font-bold text-violet-700">{due.totalDue} د.أ</TableCell>
+                          </TableRow>
+                        ))}
+                        {duesArray.length === 0 && (
+                          <TableRow>
+                            <TableCell colSpan={3} className="text-center py-8 text-neutral-400">
+                              لا توجد مستحقات للأماكن حالياً
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         )}
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { apiGet, apiPost, apiPut, apiDelete } from './lib/api';
 import Swal from 'sweetalert2';
 import { collection, query, onSnapshot, orderBy, Timestamp, addDoc, updateDoc, doc, deleteDoc, setDoc, where, writeBatch, getDocs, db, handleFirestoreError, OperationType, createNotification, notifyAllAdmins, updatePassword, updateProfile, auth as firebaseAuth } from './lib/firebase-compat';
-import { Activity, Booking, Cost, Notification, UserSettings, FoundationalCost, StaffMember, Location } from './types';
+import { Activity, Booking, Cost, Notification, UserSettings, FoundationalCost, StaffMember, Location, LocationOffer, BookingOfferItem, normalizeOffer } from './types';
 import LocationsView from './views/LocationsView';
 import FinanceView from './views/FinanceView';
 import ActivityDetails from './views/ActivityDetails';
@@ -38,7 +38,7 @@ import {
   Plus, Users, DollarSign, Calendar as CalendarIcon, TrendingUp, TrendingDown,
   Trash2, Pencil, CheckCircle2, Clock, Bell, Settings as SettingsIcon,
   LayoutDashboard, AlertTriangle, Info, Check, PieChart as PieChartIcon,
-  Building2, User as UserIcon, LogOut, Shield, Key, Menu, X, Eye, EyeOff, Loader2
+  Building2, User as UserIcon, LogOut, Shield, Key, Menu, X, Eye, EyeOff, Loader2, Gift, Filter
 } from 'lucide-react';
 import { format, isAfter, startOfDay } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from 'recharts';
@@ -81,6 +81,10 @@ export default function Dashboard() {
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
   const [editingActivityMain, setEditingActivityMain] = useState<Activity | null>(null);
   const [loading, setLoading] = useState(true);
+  // Activity filters
+  const [actFilterStatus, setActFilterStatus] = useState<string>('all');
+  const [actFilterDateFrom, setActFilterDateFrom] = useState('');
+  const [actFilterDateTo, setActFilterDateTo] = useState('');
 
   const isAdmin = profile?.role === 'admin';
   const isLocationOwner = profile?.role === 'location_owner';
@@ -129,31 +133,56 @@ export default function Dashboard() {
 
   useEffect(() => { fetchAll(); const iv = setInterval(fetchAll, 30000); return () => clearInterval(iv); }, [fetchAll]);
 
+  // Helper: calculate club revenue from a booking (uses offerItems if available)
+  const getBookingClubRevenue = useCallback((b: Booking) => {
+    if (!b.isPaid) return 0;
+    if (b.offerItems && b.offerItems.length > 0) {
+      return b.offerItems.reduce((sum, item) => sum + (item.clubShare * item.quantity), 0);
+    }
+    return b.paidAmount;
+  }, []);
+
+  const getBookingVenueRevenue = useCallback((b: Booking) => {
+    if (!b.isPaid) return 0;
+    if (b.offerItems && b.offerItems.length > 0) {
+      return b.offerItems.reduce((sum, item) => sum + (item.venueShare * item.quantity), 0);
+    }
+    return 0;
+  }, []);
+
   // Financial Calculations (memoized) [PERF-02, ARCH-03]
-  const totalRevenue = useMemo(() => bookings.reduce((sum, b) => sum + (b.isPaid ? b.paidAmount : 0), 0), [bookings]);
+  const totalRevenue = useMemo(() => bookings.reduce((sum, b) => sum + getBookingClubRevenue(b), 0), [bookings, getBookingClubRevenue]);
   const totalCosts = useMemo(() => costs.reduce((sum, c) => sum + c.amount, 0), [costs]);
   const netProfit = totalRevenue - totalCosts;
 
   const getActivityStats = useMemo(() => {
-    const statsMap = new Map<string, { revenue: number; expense: number; profit: number; attendees: number; freeAttendees: number; paidAttendees: number }>();
+    const statsMap = new Map<string, { revenue: number; venueRevenue: number; expense: number; profit: number; attendees: number; freeAttendees: number; paidAttendees: number }>();
     activities.forEach(activity => {
       const activityBookings = bookings.filter(b => b.activityId === activity.id);
       const activityCosts = costs.filter(c => c.activityId === activity.id);
-      const revenue = activityBookings.reduce((sum, b) => sum + (b.isPaid ? b.paidAmount : 0), 0);
+      const revenue = activityBookings.reduce((sum, b) => sum + getBookingClubRevenue(b), 0);
+      const venueRevenue = activityBookings.reduce((sum, b) => sum + getBookingVenueRevenue(b), 0);
       const expense = activityCosts.reduce((sum, c) => sum + c.amount, 0);
       const attendees = activityBookings.reduce((sum, b) => sum + b.count, 0);
       const freeAttendees = activityBookings.filter(b => b.isFree).reduce((sum, b) => sum + b.count, 0);
       const paidAttendees = activityBookings.filter(b => b.isPaid && !b.isFree).reduce((sum, b) => sum + b.count, 0);
-      statsMap.set(activity.id, { revenue, expense, profit: revenue - expense, attendees, freeAttendees, paidAttendees });
+      statsMap.set(activity.id, { revenue, venueRevenue, expense, profit: revenue - expense, attendees, freeAttendees, paidAttendees });
     });
-    return (activityId: string) => statsMap.get(activityId) || { revenue: 0, expense: 0, profit: 0, attendees: 0, freeAttendees: 0, paidAttendees: 0 };
-  }, [activities, bookings, costs]);
+    return (activityId: string) => statsMap.get(activityId) || { revenue: 0, venueRevenue: 0, expense: 0, profit: 0, attendees: 0, freeAttendees: 0, paidAttendees: 0 };
+  }, [activities, bookings, costs, getBookingClubRevenue, getBookingVenueRevenue]);
 
   const upcomingActivities = useMemo(() => activities
     .filter(a => isAfter(safeDate(a.date)!, startOfDay(new Date())) && a.status !== 'cancelled')
     .sort((a, b) => safeDate(a.date)!.getTime() - safeDate(b.date)!.getTime()), [activities]);
 
-  const activitiesPagination = usePagination(activities, 12);
+  const filteredActivities = useMemo(() => {
+    let result = activities;
+    if (actFilterStatus !== 'all') result = result.filter(a => a.status === actFilterStatus);
+    if (actFilterDateFrom) { const from = new Date(actFilterDateFrom); from.setHours(0,0,0,0); result = result.filter(a => new Date(a.date) >= from); }
+    if (actFilterDateTo) { const to = new Date(actFilterDateTo); to.setHours(23,59,59,999); result = result.filter(a => new Date(a.date) <= to); }
+    return result;
+  }, [activities, actFilterStatus, actFilterDateFrom, actFilterDateTo]);
+  const activitiesPagination = usePagination(filteredActivities, 12);
 
   const activeBookingsCount = useMemo(() => bookings.filter(b => {
     const activity = activities.find(a => a.id === b.activityId);
@@ -500,9 +529,33 @@ export default function Dashboard() {
                 </div>
                 {!isLocationOwner && <ActivityForm locations={locations} fetchAll={fetchAll} />}
               </div>
+              {/* Activity Filters */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-neutral-50 p-3 rounded-xl border border-neutral-100">
+                <div className="flex items-center gap-2">
+                  <Filter className="w-4 h-4 text-neutral-400 shrink-0" />
+                  <Select value={actFilterStatus} onValueChange={setActFilterStatus}>
+                    <SelectTrigger className="bg-white h-9 text-xs"><SelectValue placeholder="الحالة" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">جميع الحالات</SelectItem>
+                      <SelectItem value="planned">مخطط</SelectItem>
+                      <SelectItem value="active">نشط</SelectItem>
+                      <SelectItem value="completed">مكتمل</SelectItem>
+                      <SelectItem value="cancelled">ملغي</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Input type="date" value={actFilterDateFrom} onChange={e => setActFilterDateFrom(e.target.value)} className="bg-white h-9 text-xs" placeholder="من تاريخ" />
+                <Input type="date" value={actFilterDateTo} onChange={e => setActFilterDateTo(e.target.value)} className="bg-white h-9 text-xs" placeholder="إلى تاريخ" />
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-neutral-500">{filteredActivities.length} من {activities.length} نشاط</span>
+                  {(actFilterStatus !== 'all' || actFilterDateFrom || actFilterDateTo) && (
+                    <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { setActFilterStatus('all'); setActFilterDateFrom(''); setActFilterDateTo(''); }}>مسح</Button>
+                  )}
+                </div>
+              </div>
               <div className="flex flex-col gap-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {activities.length > 0 ? activitiesPagination.paginatedData.map(activity => (
+                  {filteredActivities.length > 0 ? activitiesPagination.paginatedData.map(activity => (
                     <div key={activity.id}>
                       <ActivityCard 
                         activity={activity} 
@@ -526,7 +579,7 @@ export default function Dashboard() {
                   currentPage={activitiesPagination.currentPage}
                   totalPages={activitiesPagination.totalPages}
                   itemsPerPage={activitiesPagination.itemsPerPage}
-                  totalItems={activities.length}
+                  totalItems={filteredActivities.length}
                   onPageChange={activitiesPagination.setCurrentPage}
                   onItemsPerPageChange={activitiesPagination.setItemsPerPage}
                   itemsPerPageOptions={[6, 12, 24, 48]}
@@ -603,7 +656,7 @@ export default function Dashboard() {
           </div>
 
           <div className={activeTab === 'finances' && !selectedActivity ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
-            <FinanceView activities={activities} bookings={bookings} costs={costs} foundationalCosts={foundationalCosts} fetchData={fetchAll} staff={staff} />
+            <FinanceView activities={activities} bookings={bookings} costs={costs} foundationalCosts={foundationalCosts} fetchData={fetchAll} staff={staff} locations={locations} />
           </div>
 
           <div className={activeTab === 'locations' && !selectedActivity ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
@@ -800,6 +853,7 @@ interface ActivityCardProps {
   activity: Activity;
   stats: {
     revenue: number;
+    venueRevenue: number;
     expense: number;
     profit: number;
     attendees: number;
@@ -937,7 +991,7 @@ function BookingsTabContent({ bookings, activities, fetchAll, staff, profile }: 
           <CardTitle>سجل الحجوزات</CardTitle>
           <CardDescription>إدارة المشاركين وحالة الدفع — {filteredBookings.length} من {bookings.length}</CardDescription>
         </div>
-        <BookingForm activities={activities} staff={staff} fetchAll={fetchAll} />
+        <BookingForm activities={activities} staff={staff} fetchAll={fetchAll} locations={locations} />
       </CardHeader>
       <CardContent>
         {/* Search & Filters */}
@@ -1009,8 +1063,11 @@ function BookingsTabContent({ bookings, activities, fetchAll, staff, profile }: 
                     </Button>
                     {!booking.isPaid && !booking.isFree && (
                       <Button size="sm" variant="outline" className="h-8 text-xs" onClick={async () => {
-                        const basePrice = activities.find(a => a.id === booking.activityId)?.basePrice || 0;
-                        const suggestedAmount = basePrice * booking.count;
+                        const activity = activities.find(a => a.id === booking.activityId);
+                        const basePrice = activity?.basePrice || 0;
+                        const suggestedAmount = (booking.offerItems && booking.offerItems.length > 0)
+                          ? booking.offerItems.reduce((s, item) => s + (item.unitPrice * item.quantity), 0)
+                          : basePrice * booking.count;
                         const staffOptions = staff.reduce((acc: Record<string,string>, s) => { acc[s.id || s.displayName] = s.displayName; return acc; }, {});
                         const { value: formValues } = await Swal.fire({
                           title: 'تأكيد الدفع',
@@ -1192,20 +1249,28 @@ function BookingsTabContent({ bookings, activities, fetchAll, staff, profile }: 
 
 // Forms
 function ActivityForm({ locations, fetchAll }: { locations: Location[], fetchAll: () => void }) {
-  const { profile } = useAuth();
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedLocationId, setSelectedLocationId] = useState<string>('none');
+  const [enabledOfferIds, setEnabledOfferIds] = useState<string[]>([]);
   
+  const selectedLocation = locations.find(l => l.id.toString() === selectedLocationId);
+  const locationOffers: LocationOffer[] = (selectedLocation?.offers || []).map((o: any, i: number) => normalizeOffer(o, i));
+  const hasEnabledOffers = enabledOfferIds.length > 0;
+
+  const toggleOffer = (offerId: string) => {
+    setEnabledOfferIds(prev => prev.includes(offerId) ? prev.filter(id => id !== offerId) : [...prev, offerId]);
+  };
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (isSubmitting) return;
     setIsSubmitting(true);
     const formData = new FormData(e.currentTarget);
     try {
-      const locationId = formData.get('locationId') as string;
       const dateStr = formData.get('date') as string;
       
-      const locName = locations.find(l => l.id.toString() === locationId)?.name || 'نشاط خارجي';
+      const locName = selectedLocation?.name || 'نشاط خارجي';
       const d = new Date(dateStr);
       const fDateAr = new Intl.DateTimeFormat('ar-EG', { day: 'numeric', month: 'long' }).format(d);
       const generatedName = `${locName} ${fDateAr}`;
@@ -1215,7 +1280,6 @@ function ActivityForm({ locations, fetchAll }: { locations: Location[], fetchAll
 
       let finalDriveLink = "";
       try {
-        // إنشاء المجلد في الدرايف تلقائياً
         const folderRes = await apiPost('/drive/folder', {
           name: driveFolderName,
           parentId: '1MLgq3qx0by7pi_MStkAofEiUYb4n33ml'
@@ -1231,13 +1295,16 @@ function ActivityForm({ locations, fetchAll }: { locations: Location[], fetchAll
         name: generatedName,
         date: new Date(dateStr).toISOString(),
         description: formData.get('description'),
-        basePrice: Number(formData.get('basePrice')),
+        basePrice: hasEnabledOffers ? 0 : Number(formData.get('basePrice') || 0),
         status: 'planned',
-        locationId: locationId && locationId !== 'none' ? Number(locationId) : null,
-        driveLink: finalDriveLink
+        locationId: selectedLocationId && selectedLocationId !== 'none' ? Number(selectedLocationId) : null,
+        driveLink: finalDriveLink,
+        enabledOfferIds: hasEnabledOffers ? enabledOfferIds : []
       });
 
       setOpen(false);
+      setSelectedLocationId('none');
+      setEnabledOfferIds([]);
       toast.success('تم إضافة النشاط بنجاح');
       fetchAll();
     } catch (err: any) {
@@ -1248,7 +1315,7 @@ function ActivityForm({ locations, fetchAll }: { locations: Location[], fetchAll
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setSelectedLocationId('none'); setEnabledOfferIds([]); } }}>
       <DialogTrigger
         render={
           <Button className="bg-neutral-900 text-white hover:bg-neutral-800">
@@ -1256,33 +1323,57 @@ function ActivityForm({ locations, fetchAll }: { locations: Location[], fetchAll
           </Button>
         }
       />
-      <DialogContent dir="rtl">
+      <DialogContent dir="rtl" className="max-w-lg">
         <DialogHeader>
           <DialogTitle>إضافة نشاط جديد</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* تم إزالة حقل اسم النشاط لأنه يتم توليده تلقائيا */}
+        <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
           <div className="space-y-2">
             <Label>التاريخ</Label>
             <Input name="date" type="datetime-local" required />
           </div>
           <div className="space-y-2">
-            <Label>سعر التذكرة (د.أ)</Label>
-            <Input name="basePrice" type="number" required placeholder="10" />
-          </div>
-          <div className="space-y-2">
-            <Label>الوصف</Label>
-            <Input name="description" placeholder="تفاصيل النشاط..." />
-          </div>
-          <div className="space-y-2">
             <Label>موقع الفعالية</Label>
-            <Select name="locationId" defaultValue="none">
+            <Select value={selectedLocationId} onValueChange={(v) => { setSelectedLocationId(v); setEnabledOfferIds([]); }}>
               <SelectTrigger><SelectValue placeholder="اختر المكان..." /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">غير محدد</SelectItem>
                 {locations.map(loc => <SelectItem key={loc.id} value={loc.id.toString()}>{loc.name}</SelectItem>)}
               </SelectContent>
             </Select>
+          </div>
+
+          {locationOffers.length > 0 && (
+            <div className="space-y-2 bg-neutral-50 rounded-xl p-4 border border-neutral-100">
+              <Label className="flex items-center gap-2 text-sm font-bold">العروض المتاحة — اختر ما تريد تفعيله</Label>
+              <div className="space-y-2 mt-2">
+                {locationOffers.map(offer => (
+                  <label key={offer.id} className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${enabledOfferIds.includes(offer.id) ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-neutral-200 hover:border-neutral-300'}`}>
+                    <input type="checkbox" checked={enabledOfferIds.includes(offer.id)} onChange={() => toggleOffer(offer.id)} className="mt-0.5 w-4 h-4 rounded border-neutral-300 text-emerald-600 focus:ring-emerald-500" />
+                    <div className="flex-1">
+                      <p className="font-bold text-sm text-neutral-800">{offer.description}</p>
+                      <div className="flex items-center gap-3 text-xs text-neutral-500 mt-1">
+                        <span>{offer.price} د.أ</span>
+                        <span className="text-emerald-600">النادي: {offer.clubShare} د.أ</span>
+                        <span className="text-blue-600">المكان: {offer.venueShare} د.أ</span>
+                      </div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {!hasEnabledOffers && (
+            <div className="space-y-2">
+              <Label>سعر التذكرة (د.أ)</Label>
+              <Input name="basePrice" type="number" required placeholder="10" />
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <Label>الوصف</Label>
+            <Input name="description" placeholder="تفاصيل النشاط..." />
           </div>
           <DialogFooter>
             <Button type="submit" className="w-full" disabled={isSubmitting}>
@@ -1299,143 +1390,140 @@ function ActivityForm({ locations, fetchAll }: { locations: Location[], fetchAll
   );
 }
 
-function BookingForm({ activities, staff, fetchAll }: { activities: Activity[], staff: StaffMember[], fetchAll: () => void }) {
+
+
+function BookingForm({ activities, staff, fetchAll, locations }: { activities: Activity[], staff: StaffMember[], fetchAll: () => void, locations: Location[] }) {
   const { profile } = useAuth();
   const [open, setOpen] = useState(false);
   const [isFree, setIsFree] = useState(false);
+  const [selectedActivityId, setSelectedActivityId] = useState<string>('');
+  const [offerQuantities, setOfferQuantities] = useState<Record<string, number>>({});
 
-  // Reset form state when dialog closes [UX-06]
-  useEffect(() => { if (!open) setIsFree(false); }, [open]);
+  useEffect(() => { if (!open) { setIsFree(false); setSelectedActivityId(''); setOfferQuantities({}); } }, [open]);
 
   const availableActivities = activities.filter(a => 
     a.status !== 'cancelled' && 
     (a.status !== 'completed' || profile?.username === 'admin')
   );
 
+  const selectedActivity = activities.find(a => a.id.toString() === selectedActivityId);
+  const selectedLocation = selectedActivity?.locationId ? locations.find(l => l.id === selectedActivity.locationId) : null;
+  
+  const enabledOffers: LocationOffer[] = (() => {
+    if (!selectedActivity || !selectedLocation || !selectedActivity.enabledOfferIds?.length) return [];
+    const allOffers = (selectedLocation.offers || []).map((o: any, i: number) => normalizeOffer(o, i));
+    return allOffers.filter(o => selectedActivity.enabledOfferIds!.includes(o.id));
+  })();
+
+  const hasOffers = enabledOffers.length > 0;
+  const totalCount = hasOffers ? Object.values(offerQuantities).reduce((s, q) => s + q, 0) : 0;
+  const totalAmount = hasOffers ? enabledOffers.reduce((s, o) => s + (o.price * (offerQuantities[o.id] || 0)), 0) : 0;
+  const totalClubShare = hasOffers ? enabledOffers.reduce((s, o) => s + (o.clubShare * (offerQuantities[o.id] || 0)), 0) : 0;
+  const totalVenueShare = hasOffers ? enabledOffers.reduce((s, o) => s + (o.venueShare * (offerQuantities[o.id] || 0)), 0) : 0;
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    const activityId = formData.get('activityId') as string;
-    const count = Number(formData.get('count'));
-    const isPaid = formData.get('isPaid') === 'true';
     const name = formData.get('name') as string;
+    const isPaid = formData.get('isPaid') === 'true';
+
+    const offerItems: BookingOfferItem[] = hasOffers ? enabledOffers
+      .filter(o => (offerQuantities[o.id] || 0) > 0)
+      .map(o => ({
+        offerId: o.id, offerName: o.description, quantity: offerQuantities[o.id] || 0,
+        unitPrice: o.price, clubShare: o.clubShare, venueShare: o.venueShare
+      })) : [];
+
+    const count = hasOffers ? totalCount : Number(formData.get('count') || 1);
+    const paidAmount = isFree ? 0 : (hasOffers ? (isPaid ? totalAmount : 0) : (isPaid ? Number(formData.get('paidAmount') || 0) : 0));
+
+    if (hasOffers && totalCount === 0) { toast.error('يرجى تحديد كمية لعرض واحد على الأقل'); return; }
 
     try {
       await apiPost('/bookings', {
-        activityId,
-        name,
-        phone: formData.get('phone'),
-        count,
-        isFree,
-        isPaid: isFree ? true : isPaid,
-        paidAmount: isFree ? 0 : (isPaid ? Number(formData.get('paidAmount')) : 0),
-        receivedBy: formData.get('receivedBy'),
-        notes: formData.get('notes')
+        activityId: selectedActivityId, name, phone: formData.get('phone'), count, isFree,
+        isPaid: isFree ? true : isPaid, paidAmount, receivedBy: formData.get('receivedBy'),
+        notes: formData.get('notes'), offerItems
       });
-
-      setOpen(false);
-      toast.success('تم تسجيل الحجز بنجاح');
-      fetchAll();
-    } catch (err: any) {
-      toast.error(err.message || 'حدث خطأ غير متوقع');
-    }
+      setOpen(false); toast.success('تم تسجيل الحجز بنجاح'); fetchAll();
+    } catch (err: any) { toast.error(err.message || 'حدث خطأ غير متوقع'); }
   };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger
-        render={
-          <Button variant="outline"><Plus className="w-4 h-4 ml-2" /> حجز جديد</Button>
-        }
-      />
-      <DialogContent dir="rtl" className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>تسجيل حجز جديد</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
+      <DialogTrigger render={<Button variant="outline"><Plus className="w-4 h-4 ml-2" /> حجز جديد</Button>} />
+      <DialogContent dir="rtl" className="max-w-lg">
+        <DialogHeader><DialogTitle>تسجيل حجز جديد</DialogTitle></DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
           <div className="space-y-2">
             <Label>النشاط</Label>
-            <Select name="activityId" required>
-              <SelectTrigger>
-                <SelectValue placeholder="اختر النشاط" />
-              </SelectTrigger>
-              <SelectContent>
-                {availableActivities.map(a => (
-                  <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
-                ))}
-              </SelectContent>
+            <Select value={selectedActivityId} onValueChange={(v) => { setSelectedActivityId(v); setOfferQuantities({}); }}>
+              <SelectTrigger><SelectValue placeholder="اختر النشاط" /></SelectTrigger>
+              <SelectContent>{availableActivities.map(a => (<SelectItem key={a.id} value={a.id.toString()}>{a.name}</SelectItem>))}</SelectContent>
             </Select>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>الاسم</Label>
-              <Input name="name" required />
-            </div>
-            <div className="space-y-2">
-              <Label>رقم الهاتف</Label>
-              <Input name="phone" />
-            </div>
+            <div className="space-y-2"><Label>الاسم</Label><Input name="name" required /></div>
+            <div className="space-y-2"><Label>رقم الهاتف</Label><Input name="phone" /></div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>عدد الأشخاص</Label>
-              <Input name="count" type="number" defaultValue="1" required />
+          {hasOffers ? (
+            <div className="space-y-3 bg-neutral-50 rounded-xl p-4 border border-neutral-100">
+              <Label className="text-sm font-bold">اختر العروض والكميات</Label>
+              {enabledOffers.map(offer => (
+                <div key={offer.id} className="flex items-center gap-3 bg-white p-3 rounded-lg border border-neutral-200">
+                  <div className="flex-1">
+                    <p className="font-bold text-sm">{offer.description}</p>
+                    <p className="text-xs text-neutral-500">{offer.price} د.أ / شخص</p>
+                  </div>
+                  <Input type="number" min="0" value={offerQuantities[offer.id] || 0}
+                    onChange={(e) => setOfferQuantities(prev => ({ ...prev, [offer.id]: Math.max(0, Number(e.target.value)) }))}
+                    className="w-20 text-center h-9" />
+                </div>
+              ))}
+              {totalCount > 0 && (
+                <div className="bg-emerald-50 rounded-lg p-3 text-sm space-y-1 border border-emerald-100">
+                  <div className="flex justify-between"><span>الإجمالي:</span> <strong>{totalAmount} د.أ ({totalCount} شخص)</strong></div>
+                  <div className="flex justify-between text-emerald-700"><span>حصة النادي:</span> <strong>{totalClubShare} د.أ</strong></div>
+                  <div className="flex justify-between text-blue-700"><span>حصة المكان:</span> <strong>{totalVenueShare} د.أ</strong></div>
+                </div>
+              )}
             </div>
-            <div className="space-y-2">
-              <Label>نوع الحجز</Label>
-              <Select onValueChange={(v) => setIsFree(v === 'true')} defaultValue="false">
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="false">مدفوع</SelectItem>
-                  <SelectItem value="true">مجاني (ضيف)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          ) : (
+            <div className="space-y-2"><Label>عدد الأشخاص</Label><Input name="count" type="number" defaultValue="1" required /></div>
+          )}
+          <div className="space-y-2">
+            <Label>نوع الحجز</Label>
+            <Select onValueChange={(v) => setIsFree(v === 'true')} defaultValue="false">
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="false">مدفوع</SelectItem>
+                <SelectItem value="true">مجاني (ضيف)</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-
           {!isFree && (
             <>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>حالة الدفع</Label>
                   <Select name="isPaid" defaultValue="false">
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="false">لم يدفع</SelectItem>
-                      <SelectItem value="true">تم الدفع</SelectItem>
-                    </SelectContent>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent><SelectItem value="false">لم يدفع</SelectItem><SelectItem value="true">تم الدفع</SelectItem></SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label>المبلغ المدفوع</Label>
-                  <Input name="paidAmount" type="number" placeholder="0" />
-                </div>
+                {!hasOffers && (<div className="space-y-2"><Label>المبلغ المدفوع</Label><Input name="paidAmount" type="number" placeholder="0" /></div>)}
               </div>
               <div className="space-y-2">
                 <Label>الموظف المستلم</Label>
                 <Select name="receivedBy">
-                  <SelectTrigger>
-                    <SelectValue placeholder="اختر الموظف" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {staff.map(s => <SelectItem key={s.id || s.displayName} value={s.displayName}>{s.displayName}</SelectItem>)}
-                  </SelectContent>
+                  <SelectTrigger><SelectValue placeholder="اختر الموظف" /></SelectTrigger>
+                  <SelectContent>{staff.map(s => <SelectItem key={s.id || s.displayName} value={s.displayName}>{s.displayName}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
             </>
           )}
-
-          <div className="space-y-2">
-            <Label>ملاحظات</Label>
-            <Input name="notes" />
-          </div>
-          <DialogFooter>
-            <Button type="submit" className="w-full">تأكيد الحجز</Button>
-          </DialogFooter>
+          <div className="space-y-2"><Label>ملاحظات</Label><Input name="notes" /></div>
+          <DialogFooter><Button type="submit" className="w-full">تأكيد الحجز</Button></DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

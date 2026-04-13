@@ -37,18 +37,20 @@ router.get('/', requireAuth, (req: AuthRequest, res) => {
   if (conditions.length) sql += ' WHERE ' + conditions.join(' AND ');
   sql += ' ORDER BY createdAt DESC';
 
-  const rows = db.prepare(sql).all(...params);
+  const rows = db.prepare(sql).all(...params) as any[];
+  rows.forEach(r => { try { r.offerItems = JSON.parse(r.offerItems || '[]'); } catch { r.offerItems = []; } });
   res.json(rows);
 });
 
 // POST /api/bookings
 router.post('/', requireAuth, (req: AuthRequest, res) => {
-  const { activityId, name, phone, count, isPaid, paidAmount, receivedBy, isFree, notes } = req.body;
+  const { activityId, name, phone, count, isPaid, paidAmount, receivedBy, isFree, notes, offerItems } = req.body;
   if (!activityId || !name) return res.status(400).json({ error: 'النشاط والاسم مطلوبان' });
 
+  const offerItemsStr = JSON.stringify(Array.isArray(offerItems) ? offerItems : []);
   const result = db.prepare(
-    'INSERT INTO bookings (activityId, name, phone, count, isPaid, paidAmount, receivedBy, isFree, notes) VALUES (?,?,?,?,?,?,?,?,?)'
-  ).run(activityId, name, phone || '', count || 1, isPaid ? 1 : 0, paidAmount || 0, receivedBy || '', isFree ? 1 : 0, notes || '');
+    'INSERT INTO bookings (activityId, name, phone, count, isPaid, paidAmount, receivedBy, isFree, notes, offerItems) VALUES (?,?,?,?,?,?,?,?,?,?)'
+  ).run(activityId, name, phone || '', count || 1, isPaid ? 1 : 0, paidAmount || 0, receivedBy || '', isFree ? 1 : 0, notes || '', offerItemsStr);
 
   logAudit(req.user!.id, 'create', 'bookings', result.lastInsertRowid.toString());
 
@@ -68,25 +70,27 @@ router.post('/', requireAuth, (req: AuthRequest, res) => {
     }
   }
 
-  const booking = db.prepare('SELECT * FROM bookings WHERE id = ?').get(result.lastInsertRowid);
+  const booking = db.prepare('SELECT * FROM bookings WHERE id = ?').get(result.lastInsertRowid) as any;
+  try { booking.offerItems = JSON.parse(booking.offerItems || '[]'); } catch { booking.offerItems = []; }
   res.status(201).json(booking);
 });
 
 // PUT /api/bookings/:id
 router.put('/:id', requireAuth, (req: AuthRequest, res) => {
   const { id } = req.params;
-  const { name, phone, count, paidAmount, receivedBy, notes, isPaid, isFree } = req.body;
+  const { name, phone, count, paidAmount, receivedBy, notes, isPaid, isFree, offerItems } = req.body;
 
   const existing = db.prepare('SELECT * FROM bookings WHERE id = ?').get(id) as any;
   if (!existing) return res.status(404).json({ error: 'الحجز غير موجود' });
 
+  const offerItemsStr = offerItems !== undefined ? JSON.stringify(Array.isArray(offerItems) ? offerItems : []) : null;
   db.prepare(
     `UPDATE bookings SET 
       name=COALESCE(?,name), phone=COALESCE(?,phone), count=COALESCE(?,count),
       paidAmount=COALESCE(?,paidAmount), receivedBy=COALESCE(?,receivedBy), notes=COALESCE(?,notes),
-      isPaid=COALESCE(?,isPaid), isFree=COALESCE(?,isFree)
+      isPaid=COALESCE(?,isPaid), isFree=COALESCE(?,isFree), offerItems=COALESCE(?,offerItems)
     WHERE id=?`
-  ).run(name, phone, count, paidAmount, receivedBy, notes, isPaid !== undefined ? (isPaid ? 1 : 0) : null, isFree !== undefined ? (isFree ? 1 : 0) : null, id);
+  ).run(name, phone, count, paidAmount, receivedBy, notes, isPaid !== undefined ? (isPaid ? 1 : 0) : null, isFree !== undefined ? (isFree ? 1 : 0) : null, offerItemsStr, id);
 
   if (isPaid === true && !existing.isPaid) {
     const admins = db.prepare('SELECT id FROM staff WHERE role = ?').all('admin') as any[];
@@ -105,7 +109,8 @@ router.put('/:id', requireAuth, (req: AuthRequest, res) => {
   }
 
   logAudit(req.user!.id, 'update', 'bookings', id, req.body);
-  const booking = db.prepare('SELECT * FROM bookings WHERE id = ?').get(id);
+  const booking = db.prepare('SELECT * FROM bookings WHERE id = ?').get(id) as any;
+  try { booking.offerItems = JSON.parse(booking.offerItems || '[]'); } catch { booking.offerItems = []; }
   res.json(booking);
 });
 
@@ -117,7 +122,8 @@ router.put('/:id/pay', requireAuth, (req: AuthRequest, res) => {
   db.prepare('UPDATE bookings SET isPaid = 1, paidAmount = ? WHERE id = ?').run(paidAmount || 0, id);
   logAudit(req.user!.id, 'update', 'bookings', id, { action: 'payment', paidAmount });
 
-  const booking = db.prepare('SELECT * FROM bookings WHERE id = ?').get(id);
+  const booking = db.prepare('SELECT * FROM bookings WHERE id = ?').get(id) as any;
+  try { booking.offerItems = JSON.parse(booking.offerItems || '[]'); } catch { booking.offerItems = []; }
   res.json(booking);
 });
 

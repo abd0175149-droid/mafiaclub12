@@ -121,6 +121,10 @@ try { db.exec('ALTER TABLE foundational_costs ADD COLUMN isProcessed INTEGER DEF
 // Safe migration for notifications
 try { db.exec('ALTER TABLE notifications ADD COLUMN targetId TEXT DEFAULT NULL'); } catch (e) { /* Column already exists */ }
 
+// Safe migrations for offers system
+try { db.exec("ALTER TABLE activities ADD COLUMN enabledOfferIds TEXT DEFAULT '[]'"); } catch (e) { /* Column already exists */ }
+try { db.exec("ALTER TABLE bookings ADD COLUMN offerItems TEXT DEFAULT '[]'"); } catch (e) { /* Column already exists */ }
+
 // --- Remove CHECK constraint on role to allow 'location_owner' ---
 // SQLite doesn't allow ALTER CHECK, so we rebuild the table if needed
 try {

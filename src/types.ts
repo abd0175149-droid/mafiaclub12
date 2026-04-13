@@ -1,8 +1,16 @@
+export interface LocationOffer {
+  id: string;
+  description: string;
+  price: number;       // السعر الإجمالي للعرض
+  clubShare: number;   // حصة النادي
+  venueShare: number;  // حصة المكان (ثابتة دائماً)
+}
+
 export interface Location {
   id: string | number;
   name: string;
   mapUrl?: string;
-  offers: ({ description: string; price: number } | string)[];
+  offers: (LocationOffer | { description: string; price: number } | string)[];
   createdAt?: string;
 }
 
@@ -15,7 +23,17 @@ export interface Activity {
   status: 'planned' | 'active' | 'completed' | 'cancelled';
   locationId?: string | number | null;
   driveLink?: string;
+  enabledOfferIds?: string[];
   createdAt: string;
+}
+
+export interface BookingOfferItem {
+  offerId: string;
+  offerName: string;
+  quantity: number;
+  unitPrice: number;   // سعر العرض الإجمالي
+  clubShare: number;   // حصة النادي لكل وحدة
+  venueShare: number;  // حصة المكان لكل وحدة
 }
 
 export interface Booking {
@@ -29,6 +47,7 @@ export interface Booking {
   receivedBy: string;
   isFree: number;
   notes: string;
+  offerItems?: BookingOfferItem[];
   createdAt: string;
 }
 
@@ -83,4 +102,18 @@ export interface StaffMember {
   lastLogin?: string | null;
   isPartner?: number | boolean;
   locationId?: number | null;
+}
+
+// Helper: normalize legacy offer to LocationOffer
+export function normalizeOffer(o: any, index: number): LocationOffer {
+  if (typeof o === 'string') {
+    return { id: `legacy-${index}`, description: o, price: 0, clubShare: 0, venueShare: 0 };
+  }
+  return {
+    id: o.id || `offer-${index}`,
+    description: o.description || '',
+    price: o.price || 0,
+    clubShare: o.clubShare ?? o.price ?? 0,
+    venueShare: o.venueShare ?? 0,
+  };
 }
