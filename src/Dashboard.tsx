@@ -38,7 +38,7 @@ import {
   Plus, Users, DollarSign, Calendar as CalendarIcon, TrendingUp, TrendingDown,
   Trash2, Pencil, CheckCircle2, Clock, Bell, Settings as SettingsIcon,
   LayoutDashboard, AlertTriangle, Info, Check, PieChart as PieChartIcon,
-  Building2, User as UserIcon, LogOut, Shield, Key, Menu, X, Eye, EyeOff, Loader2, Gift, Filter
+  Building2, User as UserIcon, LogOut, Shield, Key, Menu, X, Eye, EyeOff, Loader2, Gift, Filter, ChevronDown, ChevronUp, BarChart3
 } from 'lucide-react';
 import { format, isAfter, startOfDay } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from 'recharts';
@@ -78,6 +78,8 @@ export default function Dashboard() {
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [locations, setLocations] = useState<Location[]>([]);
   const [activeTab, setActiveTab] = useState('overview');
+  const [showCharts, setShowCharts] = useState(false);
+  const [bookingsFilterPreset, setBookingsFilterPreset] = useState<'all' | 'active_upcoming'>('all');
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
   const [editingActivityMain, setEditingActivityMain] = useState<Activity | null>(null);
   const [loading, setLoading] = useState(true);
@@ -399,9 +401,30 @@ export default function Dashboard() {
                 <KPICard title="صافي الربح" value={`${netProfit.toLocaleString()} د.أ`} icon={<DollarSign className="text-blue-500" />} subtitle="بعد خصم المصاريف" trend={netProfit >= 0 ? 'up' : 'down'} />
               )}
               {settings?.dashboardLayout.includes('bookings') && (
-                <KPICard title="الحجوزات النشطة" value={activeBookingsCount.toString()} icon={<Users className="text-amber-500" />} subtitle="للأنشطة القادمة" />
+                <KPICard 
+                  title="الحجوزات النشطة" 
+                  value={activeBookingsCount.toString()} 
+                  icon={<Users className="text-amber-500" />} 
+                  subtitle="للأنشطة القادمة — اضغط للعرض" 
+                  onClick={() => { setBookingsFilterPreset('active_upcoming'); setActiveTab('bookings'); }}
+                />
               )}
             </div>
+
+            {/* Collapsible Charts Section */}
+            <div className="mt-6">
+              <button
+                onClick={() => setShowCharts(!showCharts)}
+                className="flex items-center gap-2 text-sm font-bold text-neutral-600 hover:text-neutral-900 transition-colors px-1 py-2 rounded-lg hover:bg-neutral-100"
+              >
+                <BarChart3 className="w-4 h-4" />
+                الإحصائيات والرسوم البيانية
+                {showCharts ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
+            </div>
+
+            {showCharts && (
+            <>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
               {/* Upcoming Activities */}
@@ -518,6 +541,7 @@ export default function Dashboard() {
                 )}
               </CardContent>
             </Card>
+            </>)}
           </div>
 
           <div className={activeTab === 'activities' && !selectedActivity ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
@@ -652,7 +676,7 @@ export default function Dashboard() {
           </div>
 
           <div className={activeTab === 'bookings' && !selectedActivity ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
-            <BookingsTabContent bookings={bookings} activities={activities} fetchAll={fetchAll} staff={staff} profile={profile} locations={locations} />
+            <BookingsTabContent bookings={bookings} activities={activities} fetchAll={fetchAll} staff={staff} profile={profile} locations={locations} filterPreset={bookingsFilterPreset} onClearPreset={() => setBookingsFilterPreset('all')} />
           </div>
 
           <div className={activeTab === 'finances' && !selectedActivity ? 'block animate-in fade-in slide-in-from-bottom-4 duration-500' : 'hidden'}>
@@ -725,9 +749,9 @@ export default function Dashboard() {
   );
 }
 
-function KPICard({ title, value, icon, subtitle, trend }: { title: string, value: string, icon: React.ReactNode, subtitle: string, trend?: 'up' | 'down' }) {
+function KPICard({ title, value, icon, subtitle, trend, onClick }: { title: string, value: string, icon: React.ReactNode, subtitle: string, trend?: 'up' | 'down', onClick?: () => void }) {
   return (
-    <Card className="border-none shadow-sm bg-white overflow-hidden">
+    <Card className={`border-none shadow-sm bg-white overflow-hidden ${onClick ? 'cursor-pointer hover:shadow-md hover:ring-1 hover:ring-neutral-200 transition-all' : ''}`} onClick={onClick}>
       <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
         <CardTitle className="text-sm font-medium text-neutral-500">{title}</CardTitle>
         <div className="p-2 bg-neutral-50 rounded-lg">{icon}</div>
@@ -940,12 +964,28 @@ const ActivityCard: React.FC<ActivityCardProps> = ({ activity, stats, onDelete, 
 }
 
 // BookingsTabContent with search, filter, edit [BL-05, F-03, F-06, UX-02, UX-03]
-function BookingsTabContent({ bookings, activities, fetchAll, staff, profile, locations }: { bookings: Booking[], activities: Activity[], fetchAll: () => void, staff: StaffMember[], profile: any, locations: Location[] }) {
+function BookingsTabContent({ bookings, activities, fetchAll, staff, profile, locations, filterPreset, onClearPreset }: { bookings: Booking[], activities: Activity[], fetchAll: () => void, staff: StaffMember[], profile: any, locations: Location[], filterPreset?: 'all' | 'active_upcoming', onClearPreset?: () => void }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterActivity, setFilterActivity] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [filterActiveUpcoming, setFilterActiveUpcoming] = useState(false);
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
   const [viewingBooking, setViewingBooking] = useState<Booking | null>(null);
+
+  // Handle preset filter from KPI card
+  useEffect(() => {
+    if (filterPreset === 'active_upcoming') {
+      setFilterActiveUpcoming(true);
+      setFilterActivity('all');
+      setFilterStatus('all');
+      setSearchQuery('');
+      if (onClearPreset) onClearPreset();
+    }
+  }, [filterPreset]);
+
+  const activeUpcomingActivityIds = useMemo(() => {
+    return new Set(activities.filter(a => a.status === 'planned' || a.status === 'active').map(a => a.id));
+  }, [activities]);
 
   const filteredBookings = useMemo(() => {
     return bookings.filter(b => {
@@ -957,9 +997,10 @@ function BookingsTabContent({ bookings, activities, fetchAll, staff, profile, lo
         (filterStatus === 'paid' && b.isPaid && !b.isFree) ||
         (filterStatus === 'free' && b.isFree) ||
         (filterStatus === 'unpaid' && !b.isPaid && !b.isFree);
-      return matchSearch && matchActivity && matchStatus;
+      const matchActiveUpcoming = !filterActiveUpcoming || activeUpcomingActivityIds.has(b.activityId);
+      return matchSearch && matchActivity && matchStatus && matchActiveUpcoming;
     });
-  }, [bookings, searchQuery, filterActivity, filterStatus]);
+  }, [bookings, searchQuery, filterActivity, filterStatus, filterActiveUpcoming, activeUpcomingActivityIds]);
 
   const bookingsPagination = usePagination(filteredBookings, 10);
 
@@ -1022,6 +1063,11 @@ function BookingsTabContent({ bookings, activities, fetchAll, staff, profile, lo
               <SelectItem value="unpaid">غير مدفوع</SelectItem>
             </SelectContent>
           </Select>
+          {filterActiveUpcoming && (
+            <Button variant="outline" size="sm" className="h-9 text-xs bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100" onClick={() => setFilterActiveUpcoming(false)}>
+              عرض: الأنشطة النشطة/المخططة فقط ✕
+            </Button>
+          )}
         </div>
 
         <Table dir="rtl">
