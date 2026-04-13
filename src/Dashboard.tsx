@@ -1587,17 +1587,19 @@ function BookingForm({ activities, staff, fetchAll, locations }: { activities: A
                   </Select>
                   <input type="hidden" name="isPaid" value={isPaid ? 'true' : 'false'} />
                 </div>
-                <div className="space-y-2">
-                  <Label>الموظف المستلم</Label>
-                  <Select name="receivedBy">
-                    <SelectTrigger><SelectValue placeholder="اختر الموظف" /></SelectTrigger>
-                    <SelectContent>{staff.map(s => <SelectItem key={s.id || s.displayName} value={s.displayName}>{s.displayName}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
+                {isPaid && (
+                  <div className="space-y-2">
+                    <Label>الموظف المستلم</Label>
+                    <Select name="receivedBy">
+                      <SelectTrigger><SelectValue placeholder="اختر الموظف" /></SelectTrigger>
+                      <SelectContent>{staff.map(s => <SelectItem key={s.id || s.displayName} value={s.displayName}>{s.displayName}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                )}
               </>
             )}
           </div>
-          {!isFree && !hasOffers && (
+          {!isFree && isPaid && !hasOffers && (
             <div className="space-y-2"><Label>المبلغ المدفوع</Label><Input name="paidAmount" type="number" placeholder="0" /></div>
           )}
           <div className="space-y-2"><Label>ملاحظات</Label><Input name="notes" /></div>
