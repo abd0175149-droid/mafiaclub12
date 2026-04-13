@@ -210,13 +210,13 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
   const foundationalPagination = usePagination(foundationalCosts, 10);
 
   return (
-    <div className="flex flex-col md:flex-row gap-6 h-[calc(100vh-8rem)]">
+    <div className="flex flex-col md:flex-row gap-6">
       
       {/* Finance Internal Sidebar */}
       <div className="w-full md:w-64 shrink-0 flex flex-col gap-2">
         <button 
           onClick={() => setActiveTab('transactions')}
-          className={`flex items-center gap-3 p-4 rounded-xl text-right transition-all font-bold ${activeTab === 'transactions' ? 'bg-neutral-900 text-white shadow-lg' : 'bg-white hover:bg-neutral-100 text-neutral-600'}`}
+          className={`flex items-center gap-3 p-3 rounded-xl text-right transition-all font-bold ${activeTab === 'transactions' ? 'bg-neutral-900 text-white shadow-lg' : 'bg-white hover:bg-neutral-100 text-neutral-600'}`}
         >
           <ArrowLeftRight className="w-5 h-5 flex-shrink-0" />
           <span>{isLocationOwner ? 'الإيرادات' : 'المالية والحركات'}</span>
@@ -224,7 +224,7 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
         {!isLocationOwner && (
           <button 
             onClick={() => setActiveTab('foundational')}
-            className={`flex items-center gap-3 p-4 rounded-xl text-right transition-all font-bold ${activeTab === 'foundational' ? 'bg-neutral-900 text-white shadow-lg' : 'bg-white hover:bg-neutral-100 text-neutral-600'}`}
+            className={`flex items-center gap-3 p-3 rounded-xl text-right transition-all font-bold ${activeTab === 'foundational' ? 'bg-neutral-900 text-white shadow-lg' : 'bg-white hover:bg-neutral-100 text-neutral-600'}`}
           >
             <Building2 className="w-5 h-5 flex-shrink-0" />
             <span>مصاريف التأسيس</span>
@@ -233,7 +233,7 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
         {!isLocationOwner && (
           <button 
             onClick={() => setActiveTab('venue_dues')}
-            className={`flex items-center gap-3 p-4 rounded-xl text-right transition-all font-bold ${activeTab === 'venue_dues' ? 'bg-neutral-900 text-white shadow-lg' : 'bg-white hover:bg-neutral-100 text-neutral-600'}`}
+            className={`flex items-center gap-3 p-3 rounded-xl text-right transition-all font-bold ${activeTab === 'venue_dues' ? 'bg-neutral-900 text-white shadow-lg' : 'bg-white hover:bg-neutral-100 text-neutral-600'}`}
           >
             <MapPin className="w-5 h-5 flex-shrink-0" />
             <span>مستحقات الأماكن</span>
@@ -241,12 +241,12 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
         )}
       </div>
 
-      <div className="flex-1 overflow-auto bg-white rounded-xl shadow-sm border border-neutral-100 p-6">
+      <div className="flex-1 bg-white rounded-xl shadow-sm border border-neutral-100 p-5">
         
         {/* Transactions Tab */}
         {activeTab === 'transactions' && (
-          <div className="flex flex-col h-full">
-            <div className="flex items-center justify-between border-b pb-3">
+          <div>
+            <div className="flex items-center justify-between border-b pb-3 mb-3">
               <h2 className="text-lg font-bold flex items-center gap-2"><DollarSign className="text-emerald-500" /> {isLocationOwner ? 'إيرادات المكان' : 'الحركات المالية وتكاليف الأنشطة'}</h2>
             </div>
             
@@ -291,9 +291,8 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
               <Input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} className="bg-white h-9 text-xs" placeholder="إلى تاريخ" />
             </div>
 
-            <div className="border rounded-lg flex-1 min-h-0 overflow-auto mt-3">
-              <Table>
-                <TableHeader className="bg-neutral-50 sticky top-0 z-10">
+            <Table>
+                <TableHeader className="bg-neutral-50">
                   <TableRow>
                      <TableHead className="text-right">التاريخ</TableHead>
                      <TableHead className="text-right">البيان</TableHead>
@@ -325,7 +324,6 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
                   {filteredTransactions.length === 0 && <TableRow><TableCell colSpan={6} className="text-center py-8 text-neutral-400">لا توجد حركات مسجلة</TableCell></TableRow>}
                 </TableBody>
               </Table>
-            </div>
             <PaginationControls
               currentPage={transactionsPagination.currentPage}
               totalPages={transactionsPagination.totalPages}
@@ -340,15 +338,15 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
 
         {/* Foundational Tab (hidden for location_owner) */}
         {activeTab === 'foundational' && !isLocationOwner && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between border-b pb-4">
-              <h2 className="text-xl font-bold flex items-center gap-2"><Building2 className="text-blue-500" /> مصاريف التأسيس</h2>
+          <div>
+            <div className="flex items-center justify-between border-b pb-3 mb-3">
+              <h2 className="text-lg font-bold flex items-center gap-2"><Building2 className="text-blue-500" /> مصاريف التأسيس</h2>
               <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 px-3 py-1 text-sm">
                 الإجمالي: {totalFoundational} د.أ
               </Badge>
             </div>
             
-            <form onSubmit={handleAddFoundational} className="grid grid-cols-1 md:grid-cols-5 gap-4 bg-neutral-50 p-4 rounded-xl border border-neutral-100">
+            <form onSubmit={handleAddFoundational} className="grid grid-cols-1 md:grid-cols-5 gap-3 bg-neutral-50 p-3 rounded-xl border border-neutral-100 mb-3">
               <Input placeholder="البيان..." value={fItem} onChange={e => setFItem(e.target.value)} required className="bg-white" />
               <Input type="number" placeholder="المبلغ" value={fAmount} onChange={e => setFAmount(e.target.value)} required className="bg-white" />
               <Input placeholder="دفع بواسطة" value={fPaidBy} onChange={e => setFPaidBy(e.target.value)} className="bg-white" />
@@ -356,9 +354,8 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
               <Button type="submit" disabled={isAddingF} className="bg-neutral-900 text-white"><Plus className="w-4 h-4 ml-2" /> أضف مصاريف</Button>
             </form>
 
-            <div className="border rounded-lg flex-1 min-h-0 overflow-auto mt-3">
-              <Table>
-                <TableHeader className="bg-neutral-50 sticky top-0 z-10">
+            <Table>
+                <TableHeader className="bg-neutral-50">
                    <TableRow>
                      <TableHead className="text-right">التاريخ</TableHead>
                      <TableHead className="text-right">البيان</TableHead>
@@ -406,7 +403,6 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
                   {foundationalCosts.length === 0 && <TableRow><TableCell colSpan={6} className="text-center py-8 text-neutral-400">لا توجد مصاريف تأسيس مسجلة</TableCell></TableRow>}
                 </TableBody>
               </Table>
-            </div>
             <PaginationControls
               currentPage={foundationalPagination.currentPage}
               totalPages={foundationalPagination.totalPages}
@@ -421,9 +417,9 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
 
         {/* Venue Dues Tab */}
         {activeTab === 'venue_dues' && !isLocationOwner && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between border-b pb-4">
-              <h2 className="text-xl font-bold flex items-center gap-2"><MapPin className="text-violet-500" /> مستحقات الأماكن</h2>
+          <div>
+            <div className="flex items-center justify-between border-b pb-3 mb-3">
+              <h2 className="text-lg font-bold flex items-center gap-2"><MapPin className="text-violet-500" /> مستحقات الأماكن</h2>
             </div>
             
             {(() => {
@@ -460,9 +456,8 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
                   <Badge variant="outline" className="bg-violet-50 text-violet-700 border-violet-200 px-3 py-1 text-sm mb-4">
                     إجمالي المستحقات: {grandTotal} د.أ
                   </Badge>
-                  <div className="border rounded-lg flex-1 min-h-0 overflow-auto">
-                    <Table>
-                      <TableHeader className="bg-neutral-50 sticky top-0 z-10">
+                  <Table>
+                      <TableHeader className="bg-neutral-50">
                         <TableRow>
                           <TableHead className="text-right">المكان</TableHead>
                           <TableHead className="text-right">التفاصيل</TableHead>
@@ -493,8 +488,7 @@ export default function FinanceView({ activities, bookings, costs, foundationalC
                           </TableRow>
                         )}
                       </TableBody>
-                    </Table>
-                  </div>
+                  </Table>
                 </>
               );
             })()}
