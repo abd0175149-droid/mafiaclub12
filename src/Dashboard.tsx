@@ -1458,7 +1458,11 @@ function BookingForm({ activities, staff, fetchAll, locations }: { activities: A
           <div className="space-y-2">
             <Label>النشاط</Label>
             <Select value={selectedActivityId} onValueChange={(v) => { setSelectedActivityId(v); setOfferQuantities({}); }}>
-              <SelectTrigger><SelectValue placeholder="اختر النشاط" /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder="اختر النشاط">
+                  {selectedActivityId ? availableActivities.find(a => a.id.toString() === selectedActivityId)?.name : "اختر النشاط"}
+                </SelectValue>
+              </SelectTrigger>
               <SelectContent>{availableActivities.map(a => (<SelectItem key={a.id} value={a.id.toString()}>{a.name}</SelectItem>))}</SelectContent>
             </Select>
           </div>
@@ -1493,8 +1497,12 @@ function BookingForm({ activities, staff, fetchAll, locations }: { activities: A
           )}
           <div className="space-y-2">
             <Label>نوع الحجز</Label>
-            <Select onValueChange={(v) => setIsFree(v === 'true')} defaultValue="false">
-              <SelectTrigger><SelectValue /></SelectTrigger>
+            <Select value={isFree ? 'true' : 'false'} onValueChange={(v) => setIsFree(v === 'true')}>
+              <SelectTrigger>
+                <SelectValue placeholder="نوع الحجز">
+                  {isFree ? 'مجاني (ضيف)' : 'مدفوع'}
+                </SelectValue>
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="false">مدفوع</SelectItem>
                 <SelectItem value="true">مجاني (ضيف)</SelectItem>
@@ -1507,7 +1515,7 @@ function BookingForm({ activities, staff, fetchAll, locations }: { activities: A
                 <div className="space-y-2">
                   <Label>حالة الدفع</Label>
                   <Select name="isPaid" defaultValue="false">
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="حالة الدفع" /></SelectTrigger>
                     <SelectContent><SelectItem value="false">لم يدفع</SelectItem><SelectItem value="true">تم الدفع</SelectItem></SelectContent>
                   </Select>
                 </div>
