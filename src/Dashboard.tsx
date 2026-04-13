@@ -1070,11 +1070,15 @@ function BookingsTabContent({ bookings, activities, fetchAll, staff, profile, lo
               <SelectItem value="unpaid">غير مدفوع</SelectItem>
             </SelectContent>
           </Select>
-          {filterActiveUpcoming && (
-            <Button variant="outline" size="sm" className="h-9 text-xs bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100" onClick={() => setFilterActiveUpcoming(false)}>
-              عرض: الأنشطة النشطة/المخططة فقط ✕
-            </Button>
-          )}
+          <Button
+            variant={filterActiveUpcoming ? "default" : "outline"}
+            size="sm"
+            className={`h-9 text-xs transition-all flex items-center ${filterActiveUpcoming ? 'bg-amber-500 text-white hover:bg-amber-600 border-transparent shadow-sm' : 'text-neutral-600 hover:text-neutral-900 border-neutral-200 bg-white hover:bg-neutral-50'}`}
+            onClick={() => setFilterActiveUpcoming(!filterActiveUpcoming)}
+          >
+            <CalendarIcon className="w-3.5 h-3.5 ml-1.5" />
+            {filterActiveUpcoming ? 'تصفية: الأنشطة النشطة ✕' : 'حجوزات الأنشطة النشطة فقط'}
+          </Button>
         </div>
 
         <Table dir="rtl">
