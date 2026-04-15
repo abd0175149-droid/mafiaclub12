@@ -618,63 +618,17 @@ export default function Dashboard() {
             </div>
             {/* Edit Activity Dialog */}
             <Dialog open={!!editingActivityMain} onOpenChange={(o) => { if (!o) setEditingActivityMain(null); }}>
-              <DialogContent dir="rtl">
+              <DialogContent dir="rtl" className="max-w-lg max-h-[85vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>تعديل النشاط</DialogTitle>
                 </DialogHeader>
                 {editingActivityMain && (
-                  <form onSubmit={async (e) => {
-                    e.preventDefault();
-                    const formData = new FormData(e.currentTarget);
-                    try {
-                      const locationId = formData.get('locationId') as string;
-                      await apiPut('/activities/' + editingActivityMain.id, {
-                        name: formData.get('name') as string,
-                        date: new Date(formData.get('date') as string).toISOString(),
-                        description: formData.get('description'),
-                        basePrice: Number(formData.get('basePrice')),
-                        locationId: locationId && locationId !== 'none' ? Number(locationId) : null,
-                        driveLink: formData.get('driveLink')
-                      });
-                      setEditingActivityMain(null);
-                      toast.success('تم تحديث النشاط بنجاح');
-                      fetchAll();
-                    } catch (err: any) { toast.error(err.message || 'حدث خطأ عند التحديث'); }
-                  }} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>اسم النشاط</Label>
-                      <Input name="name" required defaultValue={editingActivityMain.name} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>التاريخ</Label>
-                      <Input name="date" type="datetime-local" required defaultValue={format(safeDate(editingActivityMain.date) || new Date(), "yyyy-MM-dd'T'HH:mm")} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>سعر التذكرة (د.أ)</Label>
-                      <Input name="basePrice" type="number" required defaultValue={editingActivityMain.basePrice} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>الوصف</Label>
-                      <Input name="description" defaultValue={editingActivityMain.description} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>موقع الفعالية</Label>
-                      <Select name="locationId" defaultValue={editingActivityMain.locationId?.toString() || "none"}>
-                        <SelectTrigger><SelectValue placeholder="اختر المكان..." /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">غير محدد</SelectItem>
-                          {locations.map(loc => <SelectItem key={loc.id} value={loc.id.toString()}>{loc.name}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>رابط التعاون Google Drive (اختياري)</Label>
-                      <Input name="driveLink" defaultValue={editingActivityMain.driveLink} dir="ltr" />
-                    </div>
-                    <DialogFooter>
-                      <Button type="submit" className="w-full">تحديث النشاط</Button>
-                    </DialogFooter>
-                  </form>
+                  <EditActivityForm
+                    activity={editingActivityMain}
+                    locations={locations}
+                    onSave={() => { setEditingActivityMain(null); toast.success('تم تحديث النشاط بنجاح'); fetchAll(); }}
+                    onError={(msg: string) => toast.error(msg)}
+                  />
                 )}
               </DialogContent>
             </Dialog>
@@ -1105,7 +1059,7 @@ function BookingsTabContent({ bookings, activities, fetchAll, staff, profile, lo
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">كل الأنشطة</SelectItem>
-              {activities.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+              {(filterActiveUpcoming ? activities.filter(a => a.status === 'planned' || a.status === 'active') : activities).map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
             </SelectContent>
           </Select>
           <Select value={filterStatus} onValueChange={setFilterStatus}>
@@ -1123,7 +1077,16 @@ function BookingsTabContent({ bookings, activities, fetchAll, staff, profile, lo
             variant={filterActiveUpcoming ? "default" : "outline"}
             size="sm"
             className={`h-9 text-xs transition-all flex items-center ${filterActiveUpcoming ? 'bg-amber-500 text-white hover:bg-amber-600 border-transparent shadow-sm' : 'text-neutral-600 hover:text-neutral-900 border-neutral-200 bg-white hover:bg-neutral-50'}`}
-            onClick={() => setFilterActiveUpcoming(!filterActiveUpcoming)}
+            onClick={() => {
+              const newVal = !filterActiveUpcoming;
+              setFilterActiveUpcoming(newVal);
+              if (newVal && filterActivity !== 'all') {
+                const selected = activities.find(a => a.id === filterActivity);
+                if (selected && selected.status !== 'planned' && selected.status !== 'active') {
+                  setFilterActivity('all');
+                }
+              }
+            }}
           >
             <CalendarIcon className="w-3.5 h-3.5 ml-1.5" />
             {filterActiveUpcoming ? 'تصفية: الأنشطة النشطة ✕' : 'حجوزات الأنشطة النشطة فقط'}
@@ -1139,6 +1102,7 @@ function BookingsTabContent({ bookings, activities, fetchAll, staff, profile, lo
               <TableHead className="text-center">الحالة</TableHead>
               <TableHead className="text-center">المبلغ</TableHead>
               <TableHead className="text-right">المستلم</TableHead>
+              <TableHead className="text-right">مدخل الحجز</TableHead>
               <TableHead className="text-center">إجراءات</TableHead>
             </TableRow>
           </TableHeader>
@@ -1161,6 +1125,7 @@ function BookingsTabContent({ bookings, activities, fetchAll, staff, profile, lo
                 </TableCell>
                 <TableCell className="text-center">{booking.paidAmount} {CURRENCY}</TableCell>
                 <TableCell className="text-right">{booking.receivedBy || '-'}</TableCell>
+                <TableCell className="text-right text-xs text-neutral-500">{booking.createdBy || '-'}</TableCell>
                 <TableCell className="text-center">
                   <div className="flex items-center justify-center gap-1">
                     <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-600" title="عرض التفاصيل" onClick={() => setViewingBooking(booking)}>
@@ -1374,6 +1339,12 @@ function BookingsTabContent({ bookings, activities, fetchAll, staff, profile, lo
                   <p className="font-bold text-neutral-900">{viewingBooking.receivedBy || '-'}</p>
                 </div>
                 <div className="bg-neutral-50 rounded-lg p-3">
+                  <p className="text-[10px] text-neutral-500 uppercase font-bold mb-1">مدخل الحجز</p>
+                  <p className="font-bold text-neutral-900">{viewingBooking.createdBy || '-'}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-4">
+                <div className="bg-neutral-50 rounded-lg p-3">
                   <p className="text-[10px] text-neutral-500 uppercase font-bold mb-1">تاريخ التسجيل</p>
                   <p className="font-bold text-neutral-900 text-sm">{viewingBooking.createdAt ? format(new Date(viewingBooking.createdAt), 'yyyy/MM/dd - hh:mm a') : '-'}</p>
                 </div>
@@ -1389,6 +1360,90 @@ function BookingsTabContent({ bookings, activities, fetchAll, staff, profile, lo
         </DialogContent>
       </Dialog>
     </Card>
+  );
+}
+
+// EditActivityForm — supports offer toggle (reflects latest offers from location)
+function EditActivityForm({ activity, locations, onSave, onError }: { activity: Activity, locations: Location[], onSave: () => void, onError: (msg: string) => void }) {
+  const [selectedLocationId, setSelectedLocationId] = useState<string>(activity.locationId?.toString() || 'none');
+  const [editEnabledOfferIds, setEditEnabledOfferIds] = useState<string[]>(activity.enabledOfferIds || []);
+
+  const selectedLocation = locations.find(l => l.id.toString() === selectedLocationId);
+  const locationOffers: LocationOffer[] = (selectedLocation?.offers || []).map((o: any, i: number) => normalizeOffer(o, i));
+
+  const toggleOffer = (offerId: string) => {
+    setEditEnabledOfferIds(prev => prev.includes(offerId) ? prev.filter(id => id !== offerId) : [...prev, offerId]);
+  };
+
+  return (
+    <form onSubmit={async (e) => {
+      e.preventDefault();
+      const formData = new FormData(e.currentTarget);
+      try {
+        const locId = selectedLocationId;
+        await apiPut('/activities/' + activity.id, {
+          name: formData.get('name') as string,
+          date: new Date(formData.get('date') as string).toISOString(),
+          description: formData.get('description'),
+          basePrice: editEnabledOfferIds.length > 0 ? 0 : Number(formData.get('basePrice')),
+          locationId: locId && locId !== 'none' ? Number(locId) : null,
+          driveLink: formData.get('driveLink'),
+          enabledOfferIds: editEnabledOfferIds
+        });
+        onSave();
+      } catch (err: any) { onError(err.message || 'حدث خطأ عند التحديث'); }
+    }} className="space-y-4">
+      <div className="space-y-2">
+        <Label>اسم النشاط</Label>
+        <Input name="name" required defaultValue={activity.name} />
+      </div>
+      <div className="space-y-2">
+        <Label>التاريخ</Label>
+        <Input name="date" type="datetime-local" required defaultValue={format(safeDate(activity.date) || new Date(), "yyyy-MM-dd'T'HH:mm")} />
+      </div>
+      <div className="space-y-2">
+        <Label>سعر التذكرة (د.أ)</Label>
+        <Input name="basePrice" type="number" required defaultValue={activity.basePrice} disabled={editEnabledOfferIds.length > 0} />
+        {editEnabledOfferIds.length > 0 && <p className="text-xs text-neutral-500">السعر يُحسب من العروض المفعّلة</p>}
+      </div>
+      <div className="space-y-2">
+        <Label>الوصف</Label>
+        <Input name="description" defaultValue={activity.description} />
+      </div>
+      <div className="space-y-2">
+        <Label>موقع الفعالية</Label>
+        <Select value={selectedLocationId} onValueChange={(v) => { setSelectedLocationId(v); setEditEnabledOfferIds([]); }}>
+          <SelectTrigger><SelectValue placeholder="اختر المكان..." /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">غير محدد</SelectItem>
+            {locations.map(loc => <SelectItem key={loc.id} value={loc.id.toString()}>{loc.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+      {locationOffers.length > 0 && (
+        <div className="space-y-2">
+          <Label>العروض المتاحة — اختر ما تريد تفعيله</Label>
+          <div className="space-y-2 max-h-48 overflow-y-auto">
+            {locationOffers.map(offer => (
+              <label key={offer.id} className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${editEnabledOfferIds.includes(offer.id) ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-neutral-200 hover:border-neutral-300'}`}>
+                <input type="checkbox" checked={editEnabledOfferIds.includes(offer.id)} onChange={() => toggleOffer(offer.id)} className="mt-0.5 w-4 h-4 rounded border-neutral-300 text-emerald-600 focus:ring-emerald-500" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-neutral-800">{offer.description}</p>
+                  <p className="text-xs text-neutral-500">{offer.price} د.أ (نادي: {offer.clubShare} | مكان: {offer.venueShare})</p>
+                </div>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+      <div className="space-y-2">
+        <Label>رابط التعاون Google Drive (اختياري)</Label>
+        <Input name="driveLink" defaultValue={activity.driveLink} dir="ltr" />
+      </div>
+      <DialogFooter>
+        <Button type="submit" className="w-full">تحديث النشاط</Button>
+      </DialogFooter>
+    </form>
   );
 }
 

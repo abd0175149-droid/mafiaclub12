@@ -47,10 +47,11 @@ router.post('/', requireAuth, (req: AuthRequest, res) => {
   const { activityId, name, phone, count, isPaid, paidAmount, receivedBy, isFree, notes, offerItems } = req.body;
   if (!activityId || !name) return res.status(400).json({ error: 'النشاط والاسم مطلوبان' });
 
+  const createdByName = req.user?.displayName || req.user?.username || '';
   const offerItemsStr = JSON.stringify(Array.isArray(offerItems) ? offerItems : []);
   const result = db.prepare(
-    'INSERT INTO bookings (activityId, name, phone, count, isPaid, paidAmount, receivedBy, isFree, notes, offerItems) VALUES (?,?,?,?,?,?,?,?,?,?)'
-  ).run(activityId, name, phone || '', count || 1, isPaid ? 1 : 0, paidAmount || 0, receivedBy || '', isFree ? 1 : 0, notes || '', offerItemsStr);
+    'INSERT INTO bookings (activityId, name, phone, count, isPaid, paidAmount, receivedBy, isFree, notes, offerItems, createdBy) VALUES (?,?,?,?,?,?,?,?,?,?,?)'
+  ).run(activityId, name, phone || '', count || 1, isPaid ? 1 : 0, paidAmount || 0, receivedBy || '', isFree ? 1 : 0, notes || '', offerItemsStr, createdByName);
 
   logAudit(req.user!.id, 'create', 'bookings', result.lastInsertRowid.toString());
 

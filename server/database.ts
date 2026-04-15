@@ -125,6 +125,7 @@ try { db.exec('ALTER TABLE notifications ADD COLUMN targetId TEXT DEFAULT NULL')
 // Safe migrations for offers system
 try { db.exec("ALTER TABLE activities ADD COLUMN enabledOfferIds TEXT DEFAULT '[]'"); } catch (e) { /* Column already exists */ }
 try { db.exec("ALTER TABLE bookings ADD COLUMN offerItems TEXT DEFAULT '[]'"); } catch (e) { /* Column already exists */ }
+try { db.exec("ALTER TABLE bookings ADD COLUMN createdBy TEXT DEFAULT ''"); } catch (e) { /* Column already exists */ }
 
 // --- Remove CHECK constraint on role to allow 'location_owner' ---
 // SQLite doesn't allow ALTER CHECK, so we rebuild the table if needed

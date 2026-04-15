@@ -49,6 +49,7 @@ export interface Booking {
   isFree: number;
   notes: string;
   offerItems?: BookingOfferItem[];
+  createdBy?: string;
   createdAt: string;
 }
 
