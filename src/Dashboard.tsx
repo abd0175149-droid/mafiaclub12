@@ -947,6 +947,7 @@ function BookingsTabContent({ bookings, activities, fetchAll, staff, profile, lo
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
   const [viewingBooking, setViewingBooking] = useState<Booking | null>(null);
   const [editOfferQuantities, setEditOfferQuantities] = useState<Record<string, number>>({});
+  const [selectedBookings, setSelectedBookings] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (editingBooking && editingBooking.offerItems && editingBooking.offerItems.length > 0) {
@@ -986,6 +987,87 @@ function BookingsTabContent({ bookings, activities, fetchAll, staff, profile, lo
   const activeUpcomingActivityIds = useMemo(() => {
     return new Set(activities.filter(a => a.status === 'planned' || a.status === 'active').map(a => a.id));
   }, [activities]);
+
+  const toggleSelection = (id: string) => {
+    const newSet = new Set(selectedBookings);
+    if (newSet.has(id)) newSet.delete(id);
+    else newSet.add(id);
+    setSelectedBookings(newSet);
+  };
+
+  const handlePaySelected = async () => {
+    const selected = bookings.filter(b => selectedBookings.has(b.id));
+    if (selected.length === 0) return;
+    
+    let totalSuggested = 0;
+    selected.forEach(booking => {
+      const activity = activities.find(a => a.id === booking.activityId);
+      const basePrice = activity?.basePrice || 0;
+      const suggestedAmount = (booking.offerItems && booking.offerItems.length > 0)
+        ? booking.offerItems.reduce((s, item) => s + (item.unitPrice * item.quantity), 0)
+        : basePrice * booking.count;
+      totalSuggested += suggestedAmount;
+    });
+
+    const { value: formValues } = await Swal.fire({
+      title: 'تأكيد الدفع لـ ' + selected.length + ' حجوزات',
+      html: `
+        <div style="text-align:right;direction:rtl;">
+          <p style="margin-bottom:12px;font-size:14px;color:#666;">المبلغ الإجمالي المقترح بناءً على الحجوزات المحددة.</p>
+          <label style="display:block;margin-bottom:4px;font-weight:600;font-size:14px;">المبلغ المدفوع الإجمالي</label>
+          <input id="swal-amount" type="number" class="swal2-input" value="${totalSuggested}" style="margin:0 0 12px 0;width:100%;text-align:right;" />
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonText: 'تأكيد الدفع',
+      cancelButtonText: 'إلغاء',
+      confirmButtonColor: '#10b981',
+      reverseButtons: true,
+      focusConfirm: false,
+      preConfirm: () => {
+        const amount = (document.getElementById('swal-amount') as HTMLInputElement)?.value;
+        if (!amount || Number(amount) <= 0) { Swal.showValidationMessage('أدخل مبلغ صحيح'); return false; }
+        return { amount: Number(amount) };
+      }
+    });
+
+    if (formValues) {
+      try {
+        let remainingAmount = formValues.amount;
+        const currentUserDisplayName = profile?.displayName || profile?.username || 'الموظف الحالي';
+        
+        await Promise.all(selected.map(async (booking, index) => {
+          const activity = activities.find(a => a.id === booking.activityId);
+          const basePrice = activity?.basePrice || 0;
+          const suggestedAmount = (booking.offerItems && booking.offerItems.length > 0)
+            ? booking.offerItems.reduce((s, item) => s + (item.unitPrice * item.quantity), 0)
+            : basePrice * booking.count;
+          
+          let payAmountForThis = 0;
+          if (totalSuggested > 0) {
+            if (index === selected.length - 1) {
+              payAmountForThis = remainingAmount;
+            } else {
+              payAmountForThis = Math.round((suggestedAmount / totalSuggested) * formValues.amount * 100) / 100;
+              remainingAmount -= payAmountForThis;
+            }
+          } else {
+            payAmountForThis = 0;
+          }
+
+          await apiPut('/bookings/' + booking.id, { 
+            isPaid: true, 
+            paidAmount: payAmountForThis, 
+            receivedBy: currentUserDisplayName
+          });
+        }));
+        
+        Swal.fire({ title: 'تم!', text: 'تم تأكيد الدفع بنجاح', icon: 'success', timer: 1500, showConfirmButton: false });
+        setSelectedBookings(new Set());
+        fetchAll();
+      } catch (err: any) { Swal.fire({ title: 'خطأ', text: err.message, icon: 'error' }); }
+    }
+  };
 
   const filteredBookings = useMemo(() => {
     return bookings.filter(b => {
@@ -1091,11 +1173,38 @@ function BookingsTabContent({ bookings, activities, fetchAll, staff, profile, lo
             <CalendarIcon className="w-3.5 h-3.5 ml-1.5" />
             {filterActiveUpcoming ? 'تصفية: الأنشطة النشطة ✕' : 'حجوزات الأنشطة النشطة فقط'}
           </Button>
+          {selectedBookings.size > 0 && (
+            <Button
+              variant="default"
+              size="sm"
+              className="h-9 text-xs transition-all flex items-center bg-emerald-500 text-white hover:bg-emerald-600 border-transparent shadow-sm"
+              onClick={handlePaySelected}
+            >
+              <DollarSign className="w-3.5 h-3.5 ml-1.5" />
+              تأكيد الدفع ({selectedBookings.size})
+            </Button>
+          )}
         </div>
 
         <Table dir="rtl">
           <TableHeader>
             <TableRow>
+              <TableHead className="w-10 text-center">
+                <input 
+                  type="checkbox" 
+                  className="rounded border-neutral-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                  checked={filteredBookings.length > 0 && selectedBookings.size === filteredBookings.filter(b => !b.isPaid && !b.isFree && !activities.find(a => a.id === b.activityId)?.isLocked).length && selectedBookings.size > 0}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      const selectable = filteredBookings.filter(b => !b.isPaid && !b.isFree && !activities.find(a => a.id === b.activityId)?.isLocked).map(b => b.id);
+                      setSelectedBookings(new Set(selectable));
+                    } else {
+                      setSelectedBookings(new Set());
+                    }
+                  }}
+                  title="تحديد الكل"
+                />
+              </TableHead>
               <TableHead className="text-right">الاسم</TableHead>
               <TableHead className="text-right">النشاط</TableHead>
               <TableHead className="text-center">العدد</TableHead>
@@ -1110,7 +1219,17 @@ function BookingsTabContent({ bookings, activities, fetchAll, staff, profile, lo
             {filteredBookings.length > 0 ? bookingsPagination.paginatedData.map(booking => {
               const isActivityLocked = activities.find(a => a.id === booking.activityId)?.isLocked;
               return (
-              <TableRow key={booking.id} id={'glow-booking-' + booking.id}>
+              <TableRow key={booking.id} id={'glow-booking-' + booking.id} className={selectedBookings.has(booking.id) ? 'bg-emerald-50/50' : ''}>
+                <TableCell className="text-center">
+                  {!isActivityLocked && !booking.isPaid && !booking.isFree && (
+                    <input 
+                      type="checkbox" 
+                      className="rounded border-neutral-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                      checked={selectedBookings.has(booking.id)}
+                      onChange={() => toggleSelection(booking.id)}
+                    />
+                  )}
+                </TableCell>
                 <TableCell className="font-medium text-right">{booking.name}</TableCell>
                 <TableCell className="text-right">{activities.find(a => a.id === booking.activityId)?.name || 'غير معروف'}</TableCell>
                 <TableCell className="text-center">{booking.count}</TableCell>
@@ -1143,18 +1262,12 @@ function BookingsTabContent({ bookings, activities, fetchAll, staff, profile, lo
                         const suggestedAmount = (booking.offerItems && booking.offerItems.length > 0)
                           ? booking.offerItems.reduce((s, item) => s + (item.unitPrice * item.quantity), 0)
                           : basePrice * booking.count;
-                        const staffOptions = staff.reduce((acc: Record<string,string>, s) => { acc[s.id || s.displayName] = s.displayName; return acc; }, {});
                         const { value: formValues } = await Swal.fire({
                           title: 'تأكيد الدفع',
                           html: `
                             <div style="text-align:right;direction:rtl;">
                               <label style="display:block;margin-bottom:4px;font-weight:600;font-size:14px;">المبلغ المدفوع</label>
                               <input id="swal-amount" type="number" class="swal2-input" value="${suggestedAmount}" style="margin:0 0 12px 0;width:100%;text-align:right;" />
-                              <label style="display:block;margin-bottom:4px;font-weight:600;font-size:14px;">الموظف المستلم</label>
-                              <select id="swal-staff" class="swal2-select" style="margin:0;width:100%;text-align:right;">
-                                <option value="">اختر الموظف</option>
-                                ${staff.map(s => '<option value="' + s.displayName + '">' + s.displayName + '</option>').join('')}
-                              </select>
                             </div>
                           `,
                           showCancelButton: true,
@@ -1165,15 +1278,14 @@ function BookingsTabContent({ bookings, activities, fetchAll, staff, profile, lo
                           focusConfirm: false,
                           preConfirm: () => {
                             const amount = (document.getElementById('swal-amount') as HTMLInputElement)?.value;
-                            const staffName = (document.getElementById('swal-staff') as HTMLSelectElement)?.value;
                             if (!amount || Number(amount) <= 0) { Swal.showValidationMessage('أدخل مبلغ صحيح'); return false; }
-                            if (!staffName) { Swal.showValidationMessage('اختر الموظف المستلم'); return false; }
-                            return { amount: Number(amount), staffName };
+                            return { amount: Number(amount) };
                           }
                         });
                         if (formValues) {
                           try {
-                            await apiPut('/bookings/' + booking.id, { isPaid: true, paidAmount: formValues.amount, receivedBy: formValues.staffName });
+                            const currentUserDisplayName = profile?.displayName || profile?.username || 'الموظف الحالي';
+                            await apiPut('/bookings/' + booking.id, { isPaid: true, paidAmount: formValues.amount, receivedBy: currentUserDisplayName });
                             Swal.fire({ title: 'تم!', text: 'تم تأكيد الدفع بنجاح', icon: 'success', timer: 1500, showConfirmButton: false });
                             fetchAll();
                           } catch (err: any) { Swal.fire({ title: 'خطأ', text: err.message, icon: 'error' }); }
@@ -1198,7 +1310,7 @@ function BookingsTabContent({ bookings, activities, fetchAll, staff, profile, lo
               </TableRow>
             )}) : (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-neutral-400">
+                <TableCell colSpan={9} className="text-center py-8 text-neutral-400">
                   {searchQuery || filterActivity !== 'all' || filterStatus !== 'all' ? 'لا توجد نتائج مطابقة' : 'لا توجد حجوزات بعد'}
                 </TableCell>
               </TableRow>
